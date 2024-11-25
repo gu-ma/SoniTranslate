@@ -1,0 +1,22 @@
+services:
+
+  sonitranslate:
+    image: sonitranslate:latest
+    build: .
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ${HOME}/.cache:/root/.cache
+    ports:
+      - 7860:7860
+    command: python app_rvc.py --public_url --theme SherlockRamos/Feliz
+    tty: true
+    environment:
+      - YOUR_HF_TOKEN=${YOUR_HF_TOKEN}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]

@@ -2861,4 +2861,5 @@ if __name__ == "__main__":
         show_error=True,
         quiet=False,
         debug=(True if logger.isEnabledFor(logging.DEBUG) else False),
+        server_name="0.0.0.0",
     )
