@@ -1,13 +1,14 @@
+name: docker-misc-${CONTAINER_NAME}
 services:
-
   sonitranslate:
-    image: sonitranslate:latest
-    container_name: sonitranslate
+    image: ${CONTAINER_NAME}:latest
+    container_name: ${CONTAINER_NAME}
     build: .
     working_dir: /app
     volumes:
       - .:/app
-      - ${HOME}/.cache:/root/.cache
+      - ${HF_HOME}:/root/.cache/huggingface
+      - ${TORCH_HOME}:/root/.cache/torch
     ports:
       - 8201:7860
     command: python app_rvc.py --public_url --theme SherlockRamos/Feliz
