@@ -215,7 +215,7 @@ class SoniTrCache:
             for key, value in self.cache_data[step].items():
                 self.set_variable(key, copy.deepcopy(value))
                 logger.debug(
-                    f"Chache load: {str(key)}"
+                    f"Cache load: {str(key)}"
                 )
 
             self.pre_step = step
@@ -325,7 +325,7 @@ class SoniTranslate(SoniTrCache):
         return self.tts_info.tts_list()
 
     def batch_multilingual_media_conversion(self, *kwargs):
-        # logger.debug(str(kwargs))
+        logger.debug(str(kwargs))
 
         media_file_arg = kwargs[0] if kwargs[0] is not None else []
 
