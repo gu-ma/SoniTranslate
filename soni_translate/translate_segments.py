@@ -4,9 +4,11 @@ from itertools import chain
 import copy
 from .language_configuration import fix_code_language, INVERTED_LANGUAGES
 from .logging_setup import logger
-import re
 import json
 import time
+import deepl
+import re
+import os
 
 TRANSLATION_PROCESS_OPTIONS = [
     "google_translator_batch",
@@ -15,12 +17,14 @@ TRANSLATION_PROCESS_OPTIONS = [
     "gpt-3.5-turbo-0125",
     "gpt-4-turbo-preview_batch",
     "gpt-4-turbo-preview",
+    "deepl_translator",
     "disable_translation",
 ]
 DOCS_TRANSLATION_PROCESS_OPTIONS = [
     "google_translator",
     "gpt-3.5-turbo-0125",
     "gpt-4-turbo-preview",
+    "deepl_translator",
     "disable_translation",
 ]
 
@@ -441,6 +445,10 @@ def translate_text(
                 fix_code_language(target),
                 fix_code_language(source)
             )
+        case "deepl_translator":
+            deepl_client = deepl_init_client()
+            glossary_id, _ = deepl_get_glossary_id(source, target, deepl_client)
+            return translate_iterative_deepl(segments, target, source, glossary_id, deepl_client)
         case model if model in ["gpt-3.5-turbo-0125", "gpt-4-turbo-preview"]:
             return gpt_sequential(segments, model, target, source)
         case model if model in ["gpt-3.5-turbo-0125_batch", "gpt-4-turbo-preview_batch",]:
@@ -455,3 +463,91 @@ def translate_text(
             return segments
         case _:
             raise ValueError("No valid translation process")
+
+def deepl_init_client():
+    auth_key = os.getenv("DEEPL_API_KEY")
+    deepl_client = deepl.DeepLClient(auth_key)
+    return deepl_client
+
+def translate_iterative_deepl(segments, target, source=None, glossary_id=0, deepl_client=None):
+    """
+    Translate text segments individually to the specified language.
+
+    Parameters:
+    - segments (list): A list of dictionaries with 'text' as a key for
+        segment text.
+    - target (str): Target language code.
+    - source (str, optional): Source language code. Defaults to None.
+    - deepl_client (DeepLClient, optional): The DeepL client to use. Defaults to None.
+
+    Returns:
+    - list: Translated text segments in the target language.
+
+    Notes:
+    - Translates each segment using DeepL.
+
+    Example:
+    segments = [{'text': 'first segment.'}, {'text': 'second segment.'}]
+    translated_segments = translate_iterative(segments, 'es')
+    """
+    if not deepl_client:
+        deepl_client = deepl_init_client()
+
+    if not source:
+        logger.debug("No source language")
+        source = "auto"
+
+    segments_ = copy.deepcopy(segments)
+
+    # Convert segments_ to a string to use as context
+    # Doesnt work at the moment, messing things up
+    context = "".join([s["text"] for s in segments_])
+
+    # Add context + glossary
+    for line in tqdm(range(len(segments_))):
+        text = segments_[line]["text"]
+        translated_line = deepl_client.translate_text(
+            text,
+            target_lang=target,
+            source_lang=source,
+            glossary=glossary_id,
+            # context=context,
+        )
+        segments_[line]["text"] = translated_line.text
+
+    return segments_
+
+def deepl_get_glossary_id(source_lang, target_lang, deepl_client=None):
+    """
+    Get the glossary ID for a specific source and target language.
+
+    Args:
+        source_lang (str): The source language code.
+        target_lang (str): The target language code.
+
+    Returns:
+        int: The ID of the glossary if found, otherwise 0.
+        list: A list of matching glossary IDs.
+    """
+    if not deepl_client:
+        deepl_client = deepl_init_client()
+
+    glossary_id = 0
+
+    # Get the list of glossaries
+    glossaries = deepl_client.list_multilingual_glossaries()
+
+    matching_glossaries = []
+
+    for glossary in glossaries:
+        for d in glossary.dictionaries:
+            # Normalize and compare languages
+            if (
+                d.source_lang.strip().lower() == source_lang.strip().lower() and
+                d.target_lang.strip().lower() == target_lang.strip().lower()
+            ):
+                matching_glossaries.append(glossary.glossary_id)
+
+    glossary_id = matching_glossaries[0]
+
+    return glossary_id, matching_glossaries
