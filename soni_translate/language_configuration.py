@@ -23,7 +23,7 @@ LANGUAGES_UNIDIRECTIONAL = {
     "Tigrinya (ti)": "ti",
     "Tsonga (ts)": "ts",
     "Akan (ak)": "ak",
-    "Uighur (ug)": "ug"
+    "Uighur (ug)": "ug",
 }
 
 UNIDIRECTIONAL_L_LIST = LANGUAGES_UNIDIRECTIONAL.keys()
@@ -116,7 +116,7 @@ LANGUAGES = {
     "Uzbek (uz)": "uz",
     "Yoruba (yo)": "yo",
     "Tagalog (tl)": "tl",
-    **LANGUAGES_UNIDIRECTIONAL
+    **LANGUAGES_UNIDIRECTIONAL,
 }
 
 BASE_L_LIST = LANGUAGES.keys()
@@ -164,10 +164,10 @@ EXTRA_ALIGN = {
     "no": "NbAiLab/wav2vec2-xlsr-300m-norwegian",
     "zh-TW": "jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn",
     "as": "",
-    "eu": "", # cahya/wav2vec2-large-xlsr-basque # verify
+    "eu": "",  # cahya/wav2vec2-large-xlsr-basque # verify
     "ha": "infinitejoy/wav2vec2-large-xls-r-300m-hausa",
     "ht": "",
-    "hy": "infinitejoy/wav2vec2-large-xls-r-300m-armenian", # no (.)
+    "hy": "infinitejoy/wav2vec2-large-xls-r-300m-armenian",  # no (.)
     "lo": "",
     "mg": "",
     "mn": "tugstugi/wav2vec2-large-xlsr-53-mongolian",
@@ -483,11 +483,64 @@ VITS_VOICES_LIST = {
 }
 
 OPENAI_TTS_CODES = [
-    "af", "ar", "hy", "az", "be", "bs", "bg", "ca", "zh", "hr", "cs", "da",
-    "nl", "en", "et", "fi", "fr", "gl", "de", "el", "he", "hi", "hu", "is",
-    "id", "it", "ja", "kn", "kk", "ko", "lv", "lt", "mk", "ms", "mr", "mi",
-    "ne", "no", "fa", "pl", "pt", "ro", "ru", "sr", "sk", "sl", "es", "sw",
-    "sv", "tl", "ta", "th", "tr", "uk", "ur", "vi", "cy", "zh-TW"
+    "af",
+    "ar",
+    "hy",
+    "az",
+    "be",
+    "bs",
+    "bg",
+    "ca",
+    "zh",
+    "hr",
+    "cs",
+    "da",
+    "nl",
+    "en",
+    "et",
+    "fi",
+    "fr",
+    "gl",
+    "de",
+    "el",
+    "he",
+    "hi",
+    "hu",
+    "is",
+    "id",
+    "it",
+    "ja",
+    "kn",
+    "kk",
+    "ko",
+    "lv",
+    "lt",
+    "mk",
+    "ms",
+    "mr",
+    "mi",
+    "ne",
+    "no",
+    "fa",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sr",
+    "sk",
+    "sl",
+    "es",
+    "sw",
+    "sv",
+    "tl",
+    "ta",
+    "th",
+    "tr",
+    "uk",
+    "ur",
+    "vi",
+    "cy",
+    "zh-TW",
 ]
 
 OPENAI_TTS_MODELS = [
@@ -502,8 +555,67 @@ OPENAI_TTS_MODELS = [
     ">fable HD OpenAI-TTS",
     ">onyx HD OpenAI-TTS",
     ">nova HD OpenAI-TTS",
-    ">shimmer HD OpenAI-TTS"
+    ">shimmer HD OpenAI-TTS",
 ]
+
+ELEVENLABS_VOICES_LIST = {
+    "MarcoTrox 11LABS": {
+        "voice_id": "W71zT1VwIFFx3mMGH2uZ",
+        "verified_languages": [
+            "de",
+            "pl",
+            "hi",
+            "pt",
+            "it",
+            "es",
+            "ja",
+            "fr",
+            "ar",
+            "da",
+        ],
+    },
+    "Emilia 11LABS": {
+        "voice_id": "Dt2jDzhoZC0pZw5bmy2S",
+        "verified_languages": ["en", "pt", "it", "es", "cs", "pl", "hi", "fr"],
+    },
+    "Rachel 11LABS": {"voice_id": "21m00Tcm4TlvDq8ikWAM", "verified_languages": []},
+    "Drew 11LABS": {"voice_id": "29vD33N1CtxCmqQRPOHJ", "verified_languages": []},
+    "Clyde 11LABS": {"voice_id": "2EiwWnXFnvU5JabPnv8n", "verified_languages": []},
+    "Paul 11LABS": {"voice_id": "5Q0t7uMcjvnagumLfvZi", "verified_languages": []},
+    "Aria 11LABS": {
+        "voice_id": "9BWtsMINqrJLrRacOk9x",
+        "verified_languages": [
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "fr",
+            "zh",
+            "tr",
+        ],
+    },
+    "Domi 11LABS": {"voice_id": "AZnzlk1XvdvUeBnXmlld", "verified_languages": []},
+    "Dave 11LABS": {"voice_id": "CYw3kZ02Hs0563khs1Fj", "verified_languages": []},
+    "Roger 11LABS": {
+        "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
+        "verified_languages": [
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "fr",
+            "de",
+            "nl",
+            "es",
+        ],
+    },
+}
 
 LANGUAGE_CODE_IN_THREE_LETTERS = {
     "Automatic detection": "aut",

@@ -6,6 +6,7 @@ from .language_configuration import (
     fix_code_language,
     BARK_VOICES_LIST,
     VITS_VOICES_LIST,
+    ELEVENLABS_VOICES_LIST
 )
 from .utils import (
     download_manager,
@@ -25,6 +26,7 @@ import platform
 import logging
 import traceback
 from .logging_setup import logger
+import wave
 
 
 class TTS_OperationError(Exception):
@@ -940,6 +942,62 @@ def segments_openai_tts(
 
 
 # =====================================
+# ELEVENLABS
+# =====================================
+
+
+def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
+    from elevenlabs.client import ElevenLabs
+    from elevenlabs import save
+
+    # API key is already an environment variable
+    client = ElevenLabs()
+
+    segments = filtered_elevenlabs_segments["segments"]
+
+    for idx, segment in tqdm(enumerate(segments)):
+
+        # Get previous and next text, if they exist
+        previous_text = segments[idx - 1]["text"] if idx > 0 else ""
+        next_text = segments[idx + 1]["text"] if idx < len(segments) - 1 else ""
+
+        speaker = segment["speaker"]
+        text = segment["text"].strip()
+        start = segment["start"]
+        tts_name = segment["tts_name"]
+        voice_id = ELEVENLABS_VOICES_LIST[tts_name]["voice_id"]
+
+        logger.info(f"{str(segment)[:60]}...{str(segment)[-60:]}")
+
+        # make the tts audio
+        filename = f"audio/{start}.wav"
+        filename_raw = f"audio/{start}.pcm"
+        logger.info(f"{text} >> {filename}")
+
+        try:
+
+            audio = client.text_to_speech.convert(
+                text=text,
+                voice_id=voice_id,
+                model_id="eleven_multilingual_v2",
+                output_format="pcm_24000",
+                previous_text=previous_text,
+                next_text=next_text
+            )
+
+            save(audio, filename_raw)
+
+            # Read the raw PCM data
+            pcm_data = np.fromfile(filename_raw, dtype=np.int16)
+
+            # Save the PCM data as a WAV file
+            save_np_as_wav(pcm_data, filename)
+
+        except Exception as error:
+            error_handling_in_tts(error, segment, TRANSLATE_AUDIO_TO, filename)
+
+
+# =====================================
 # Select task TTS
 # =====================================
 
@@ -1022,6 +1080,7 @@ def audio_segmentation_to_voice(
     pattern_coqui = re.compile(r".+\.(wav|mp3|ogg|m4a)$")
     pattern_vits_onnx = re.compile(r".* VITS-onnx$")
     pattern_openai_tts = re.compile(r".* OpenAI-TTS$")
+    pattern_elevenlabs = re.compile(r".* 11LABS$")
 
     all_segments = result_diarize["segments"]
 
@@ -1035,6 +1094,7 @@ def audio_segmentation_to_voice(
     speakers_openai_tts = find_spkr(
         pattern_openai_tts, speaker_to_voice, all_segments
     )
+    speakers_elevenlabs = find_spkr(pattern_elevenlabs, speaker_to_voice, all_segments)
 
     # Filter method in segments
     filtered_edge = filter_by_speaker(speakers_edge, all_segments)
@@ -1043,6 +1103,7 @@ def audio_segmentation_to_voice(
     filtered_coqui = filter_by_speaker(speakers_coqui, all_segments)
     filtered_vits_onnx = filter_by_speaker(speakers_vits_onnx, all_segments)
     filtered_openai_tts = filter_by_speaker(speakers_openai_tts, all_segments)
+    filtered_elevenlabs = filter_by_speaker(speakers_elevenlabs, all_segments)
 
     # Infer
     if filtered_edge["segments"]:
@@ -1072,6 +1133,9 @@ def audio_segmentation_to_voice(
     if filtered_openai_tts["segments"]:
         logger.info(f"OpenAI TTS: {speakers_openai_tts}")
         segments_openai_tts(filtered_openai_tts, TRANSLATE_AUDIO_TO)  # wav
+    if filtered_elevenlabs["segments"]:
+        logger.info(f"ElevenLabs TTS: {speakers_elevenlabs}")
+        segments_elevenlabs_tts(filtered_elevenlabs, TRANSLATE_AUDIO_TO)  # wav
 
     [result.pop("tts_name", None) for result in result_diarize["segments"]]
     return [
@@ -1080,7 +1144,8 @@ def audio_segmentation_to_voice(
         speakers_vits,
         speakers_coqui,
         speakers_vits_onnx,
-        speakers_openai_tts
+        speakers_openai_tts,
+        speakers_elevenlabs
     ]
 
 
@@ -1099,7 +1164,8 @@ def accelerate_segments(
         speakers_vits,
         speakers_coqui,
         speakers_vits_onnx,
-        speakers_openai_tts
+        speakers_openai_tts,
+        speakers_elevenlabs
     ) = valid_speakers
 
     create_directories(f"{folder_output}/audio/")
@@ -1117,9 +1183,14 @@ def accelerate_segments(
         speaker = segment["speaker"]
 
         # find name audio
+        if speaker in speakers_elevenlabs:
+            filename = f"audio/{start}.wav"
+        else:
+            filename = f"audio/{start}.ogg"
+
         # if speaker in speakers_edge:
-        filename = f"audio/{start}.ogg"
-        # elif speaker in speakers_bark + speakers_vits + speakers_coqui + speakers_vits_onnx:
+        # filename = f"audio/{start}.ogg"
+        # # elif speaker in speakers_bark + speakers_vits + speakers_coqui + speakers_vits_onnx:
         #    filename = f"audio/{start}.wav" # wav
 
         # duration
@@ -1557,6 +1628,14 @@ def toneconverter(
                     model=method_vc,
                 )
 
+# Save numpy as wave
+def save_np_as_wav(array, output_path):
+    with wave.open(output_path, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit = 2 bytes
+        wf.setframerate(24000)
+        wf.writeframes(array.tobytes())
+    return
 
 if __name__ == "__main__":
     from segments import result_diarize

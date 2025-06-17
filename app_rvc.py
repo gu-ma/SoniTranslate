@@ -40,6 +40,7 @@ from soni_translate.language_configuration import (
     BARK_VOICES_LIST,
     VITS_VOICES_LIST,
     OPENAI_TTS_MODELS,
+    ELEVENLABS_VOICES_LIST
 )
 from soni_translate.utils import (
     remove_files,
@@ -119,6 +120,7 @@ class TTS_Info:
         self.list_edge = edge_tts_voices_list()
         self.list_bark = list(BARK_VOICES_LIST.keys())
         self.list_vits = list(VITS_VOICES_LIST.keys())
+        self.list_elevenlabs = list(ELEVENLABS_VOICES_LIST.keys())
         self.list_openai_tts = OPENAI_TTS_MODELS
         self.piper_enabled = piper_enabled
         self.list_vits_onnx = (
@@ -136,6 +138,7 @@ class TTS_Info:
             + self.list_vits
             + self.list_openai_tts
             + self.list_vits_onnx
+            + self.list_elevenlabs
         )
         return list_tts
 
@@ -406,7 +409,7 @@ class SoniTranslate(SoniTrCache):
         max_accelerate_audio=2.1,
         acceleration_rate_regulation=False,
         volume_original_audio=0.25,
-        volume_translated_audio=1.80,
+        volume_translated_audio=1.10,
         output_format_subtitle="srt",
         get_translated_text=False,
         get_video_from_text_json=False,
@@ -415,8 +418,8 @@ class SoniTranslate(SoniTrCache):
         vocal_refinement=False,
         literalize_numbers=True,
         segment_duration_limit=15,
-        diarization_model="pyannote_2.1",
-        translate_process="google_translator_batch",
+        diarization_model="pyannote_3.1",
+        translate_process="deep_translator",
         subtitle_file=None,
         output_type="video (mp4)",
         voiceless_track=False,
@@ -810,7 +813,6 @@ class SoniTranslate(SoniTrCache):
                     source=lang_source,
                 )
                 logger.debug("Translation complete")
-                logger.debug(self.result_diarize)
 
         if get_translated_text:
 
@@ -1740,7 +1742,7 @@ def create_gui(theme, logs_in_gui=False):
                         ):
                             audio_accelerate = gr.Slider(
                                 label=lg_conf["acc_max_label"],
-                                value=1.9,
+                                value=1.1,
                                 step=0.1,
                                 minimum=1.0,
                                 maximum=2.5,
@@ -1774,7 +1776,7 @@ def create_gui(theme, logs_in_gui=False):
                             volume_original_mix = gr.Slider(
                                 label=lg_conf["vol_ori"],
                                 info="for Adjusting volumes and mixing audio",
-                                value=0.25,
+                                value=0.60,
                                 step=0.05,
                                 minimum=0.0,
                                 maximum=2.50,
@@ -1784,7 +1786,7 @@ def create_gui(theme, logs_in_gui=False):
                             volume_translated_mix = gr.Slider(
                                 label=lg_conf["vol_tra"],
                                 info="for Adjusting volumes and mixing audio",
-                                value=1.80,
+                                value=1.50,
                                 step=0.05,
                                 minimum=0.0,
                                 maximum=2.50,
@@ -1904,12 +1906,12 @@ def create_gui(theme, logs_in_gui=False):
                             )
                             diarization_process_dropdown = gr.Dropdown(
                                 pyannote_models_list,
-                                value=pyannote_models_list[1],
+                                value=pyannote_models_list[0],
                                 label=lg_conf["diarization_label"],
                             )
                             translate_process_dropdown = gr.Dropdown(
                                 TRANSLATION_PROCESS_OPTIONS,
-                                value=TRANSLATION_PROCESS_OPTIONS[0],
+                                value=TRANSLATION_PROCESS_OPTIONS[6],
                                 label=lg_conf["tr_process_label"],
                             )
 
