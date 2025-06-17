@@ -548,6 +548,6 @@ def deepl_get_glossary_id(source_lang, target_lang, deepl_client=None):
             ):
                 matching_glossaries.append(glossary.glossary_id)
 
-    glossary_id = matching_glossaries[0]
+    glossary_id = matching_glossaries[0] if matching_glossaries else None
 
     return glossary_id, matching_glossaries
