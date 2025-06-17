@@ -11,10 +11,13 @@ services:
       - ${TORCH_HOME}:/root/.cache/torch
     ports:
       - 8201:7860
-    command: python app_rvc.py --public_url --theme SherlockRamos/Feliz
+    command: python app_rvc.py --public_url --theme SherlockRamos/Feliz --verbosity_level debug
     tty: true
     environment:
       - YOUR_HF_TOKEN=${YOUR_HF_TOKEN}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEEPL_API_KEY=${DEEPL_API_KEY}
     deploy:
       resources:
         reservations:
