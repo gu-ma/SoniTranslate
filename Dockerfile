@@ -30,17 +30,24 @@ COPY . /src
 # Install 
 RUN pip install -r /src/requirements_base.txt
 RUN pip install -r /src/requirements_extra.txt
-RUN pip install onnxruntime-gpu
+
+# Install ONNX runtime Cuda 12.0 (https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-12x)
+# RUN pip install onnxruntime-gpu
+
+# Install ONNX runtime Cuda 11.X (https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-11x)
+RUN pip install flatbuffers numpy packaging protobuf sympy
+RUN pip install onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
 
 # Install optionnal
 RUN pip install -q piper-tts==1.2.0
 RUN pip install -q -r /src/requirements_xtts.txt
 RUN pip install -q TTS==0.21.1  --no-deps
 
+# Install additional
+RUN pip install deepl elevenlabs python-dotenv
+
 # TCMAlloc
 RUN apt-get update && apt-get install -y --no-install-recommends libgoogle-perftools-dev
 
 # Symlink python
 RUN ln -n /usr/bin/python3 /usr/bin/python
-
-RUN pip install python-dotenv
