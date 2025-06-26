@@ -364,10 +364,25 @@ class SoniTranslate(SoniTrCache):
 
         result = []
         for media in media_batch:
+
             # Call the nested function with the parameters
-            output_file = self.multilingual_media_conversion(
-                media, "", "", *kwargs
-            )
+
+            # output_file = self.multilingual_media_conversion(
+            #     media, "", "", *kwargs
+            # )
+
+            try:
+                output_file = self.multilingual_media_conversion(media, "", "", *kwargs)
+            except ValueError as e:
+                if "No active speech found in audio" in str(e):
+                    logger.warning(f"Skipping file {media} - no speech detected")
+                    if is_gui_arg:
+                        gr.Warning(
+                            f"No speech detected in {os.path.basename(media) if media else 'audio file'}"
+                        )
+                    continue  # Skip this media file and continue with the next one
+                else:
+                    raise  # Re-raise other ValueErrors
 
             if isinstance(output_file, str):
                 output_file = [output_file]

@@ -43,8 +43,25 @@ class Mixer:
         output = np.zeros(sample_count, dtype="int32")
         for offset, seg in parts:
             sample_offset = offset * channels
-            samples = np.frombuffer(seg.get_array_of_samples(), dtype="int32")
+
+            # samples = np.frombuffer(seg.get_array_of_samples(), dtype="int32")
+            # samples = np.int16(samples/np.max(np.abs(samples)) * 32767)
+
+            sample_width = seg.sample_width
+            if sample_width == 1:
+                dtype = np.int8
+            elif sample_width == 2:
+                dtype = np.int16
+            elif sample_width == 4:
+                dtype = np.int32
+            else:
+                raise ValueError(f"Unsupported sample width: {sample_width}")
+
+            samples = np.frombuffer(seg.get_array_of_samples(), dtype=dtype)
+            samples = samples.astype(np.int32)
+
             samples = np.int16(samples/np.max(np.abs(samples)) * 32767)
+
             start = sample_offset
             end = start + len(samples)
             output[start:end] += samples

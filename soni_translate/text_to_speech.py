@@ -952,6 +952,7 @@ def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
 
     # API key is already an environment variable
     client = ElevenLabs()
+    sample_rate = 24000
 
     segments = filtered_elevenlabs_segments["segments"]
 
@@ -971,7 +972,9 @@ def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
 
         # make the tts audio
         filename = f"audio/{start}.wav"
-        filename_raw = f"audio/{start}.pcm"
+        # filename = f"audio/{start}.ogg"
+        temp_file = f"audio/{start}.pcm"
+
         logger.info(f"{text} >> {filename}")
 
         try:
@@ -980,18 +983,29 @@ def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
                 text=text,
                 voice_id=voice_id,
                 model_id="eleven_multilingual_v2",
-                output_format="pcm_24000",
+                output_format=f"pcm_{sample_rate}",
                 previous_text=previous_text,
                 next_text=next_text
             )
 
-            save(audio, filename_raw)
+            save(audio, temp_file)
 
             # Read the raw PCM data
-            pcm_data = np.fromfile(filename_raw, dtype=np.int16)
+            pcm_data = np.fromfile(temp_file, dtype=np.int16)
 
             # Save the PCM data as a WAV file
             save_np_as_wav(pcm_data, filename)
+
+            # data = pad_array(pcm_data, sample_rate)
+            # # Save file
+            # write_chunked(
+            #     file=filename,
+            #     samplerate=sample_rate,
+            #     data=data,
+            #     format="ogg",
+            #     subtype="vorbis",
+            # )
+            # verify_saved_file_and_size(filename)
 
         except Exception as error:
             error_handling_in_tts(error, segment, TRANSLATE_AUDIO_TO, filename)
@@ -1182,7 +1196,9 @@ def accelerate_segments(
         end = segment["end"]
         speaker = segment["speaker"]
 
-        # find name audio
+        # # All files are ogg
+        # filename = f"audio/{start}.ogg"
+
         if speaker in speakers_elevenlabs:
             filename = f"audio/{start}.wav"
         else:
