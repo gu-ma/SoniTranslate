@@ -949,10 +949,15 @@ def segments_openai_tts(
 def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
     from elevenlabs.client import ElevenLabs
     from elevenlabs import save
+    import base64
 
     # API key is already an environment variable
     client = ElevenLabs()
     sample_rate = 24000
+
+    # Only for model_id eleven_multilingual_v2
+    voice_settings = client.voices.settings.get_default().dict()
+    voice_settings['speed'] = 1.0
 
     segments = filtered_elevenlabs_segments["segments"]
 
@@ -975,20 +980,41 @@ def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
         # filename = f"audio/{start}.ogg"
         temp_file = f"audio/{start}.pcm"
 
-        logger.info(f"{text} >> {filename}")
+        logger.info(f"{speaker} | {tts_name} | {text} >> {filename}")
 
         try:
 
-            audio = client.text_to_speech.convert(
+            # audio = client.text_to_speech.convert(
+            #     text=text,
+            #     voice_id=voice_id,
+            #     model_id="eleven_multilingual_v2",
+            #     output_format=f"pcm_{sample_rate}",
+            #     previous_text=previous_text,
+            #     next_text=next_text
+            # )
+
+            # save(audio, temp_file)
+
+            results = client.text_to_speech.convert_with_timestamps(
                 text=text,
                 voice_id=voice_id,
-                model_id="eleven_multilingual_v2",
+                model_id="eleven_v3",
                 output_format=f"pcm_{sample_rate}",
-                previous_text=previous_text,
-                next_text=next_text
+                apply_text_normalization='on',
+                # previous_text=previous_text,
+                # next_text=next_text,
+                voice_settings=voice_settings,
+                seed=123456,
             )
 
-            save(audio, temp_file)
+            # Duration
+            ets = results.alignment.character_end_times_seconds
+            duration = ets[len(ets) - 1]
+            logger.info(f"Duration: {duration}")
+
+            audio = base64.b64decode(results.audio_base_64)
+            with open(temp_file, "wb") as f:
+                f.write(audio)
 
             # Read the raw PCM data
             pcm_data = np.fromfile(temp_file, dtype=np.int16)
@@ -1167,6 +1193,7 @@ def accelerate_segments(
     result_diarize,
     max_accelerate_audio,
     valid_speakers,
+    min_accelerate_audio=1,
     acceleration_rate_regulation=False,
     folder_output="audio2",
 ):
@@ -1246,6 +1273,8 @@ def accelerate_segments(
 
         if acc_percentage > max_accelerate_audio:
             acc_percentage = max_accelerate_audio
+        elif acc_percentage < min_accelerate_audio:
+            acc_percentage = min_accelerate_audio
         elif acc_percentage <= 1.15 and acc_percentage >= 0.8:
             acc_percentage = 1.0
         elif acc_percentage <= 0.79:
