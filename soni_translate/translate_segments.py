@@ -50,7 +50,7 @@ def translate_iterative(segments, target, source=None):
     translated_segments = translate_iterative(segments, 'es')
     """
 
-    segments_ = copy.deepcopy(segments)
+    segments_copy = copy.deepcopy(segments)
 
     if (
         not source
@@ -60,12 +60,12 @@ def translate_iterative(segments, target, source=None):
 
     translator = GoogleTranslator(source=source, target=target)
 
-    for line in tqdm(range(len(segments_))):
-        text = segments_[line]["text"]
+    for line in tqdm(range(len(segments_copy))):
+        text = segments_copy[line]["text"]
         translated_line = translator.translate(text.strip())
-        segments_[line]["text"] = translated_line
+        segments_copy[line]["text"] = translated_line
 
-    return segments_
+    return segments_copy
 
 
 def verify_translate(
@@ -497,25 +497,40 @@ def translate_iterative_deepl(segments, target, source=None, glossary_id=0, deep
         logger.debug("No source language")
         source = "auto"
 
-    segments_ = copy.deepcopy(segments)
+    segments_copy = copy.deepcopy(segments)
 
-    # Convert segments_ to a string to use as context
-    # Doesnt work at the moment, messing things up
-    context = "".join([s["text"] for s in segments_])
+    # Concat the segments in an array
+    segments_text = [ segment['text'] for segment in segments ]
 
-    # Add context + glossary
-    for line in tqdm(range(len(segments_))):
-        text = segments_[line]["text"]
-        translated_line = deepl_client.translate_text(
-            text,
-            target_lang=target,
-            source_lang=source,
-            glossary=glossary_id,
-            # context=context,
-        )
-        segments_[line]["text"] = translated_line.text
+    # Translate the whole text at once
+    translated_segments_text = deepl_client.translate_text(
+        segments_text,
+        target_lang=target,
+        source_lang=source,
+        glossary=glossary_id,
+        preserve_formatting=True,
+        split_sentences=1
+    )
 
-    return segments_
+    # Update the text in segments' copy
+    for line in range(len(translated_segments_text)):
+        segments_copy[line]["text"] = translated_segments_text[line].text
+
+    # Convert segments_copy to a string to use as context
+    # context = "".join([s["text"] for s in segments_copy])
+
+    # for line in tqdm(range(len(segments_copy))):
+    #     text = segments_copy[line]["text"]
+    #     translated_line = deepl_client.translate_text(
+    #         text,
+    #         target_lang=target,
+    #         source_lang=source,
+    #         glossary=glossary_id,
+    #         # context=context,
+    #     )
+    #     segments_copy[line]["text"] = translated_line.text
+
+    return segments_copy
 
 def deepl_get_glossary_id(source_lang, target_lang, deepl_client=None):
     """
