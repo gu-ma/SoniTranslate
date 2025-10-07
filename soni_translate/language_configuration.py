@@ -559,6 +559,69 @@ OPENAI_TTS_MODELS = [
 ]
 
 ELEVENLABS_VOICES_LIST = {
+    "Oliver 11LABS": {
+        "voice_id": "L1aJrPa7pLJEyYlh3Ilq",
+        "verified_languages": [
+            "hi",
+            "el",
+            "es",
+            "fr",
+            "ar",
+            "id",
+            "fil",
+            "tr",
+            "hi",
+            "cs",
+            "ru",
+            "pt",
+            "sk",
+            "el",
+            "sv",
+            "ta",
+            "it"
+        ]
+    },
+    "Sara 11LABS": {
+        "voice_id": "uV2Bhcm1HwmAqPqkbjfl",
+        "verified_languages": []
+    },
+    "Andrea 11LABS": {
+        "voice_id": "7WZPc0ZjFzsx74E5qoQV",
+        "verified_languages": []
+    },
+    "Mia 11LABS": {
+        "voice_id": "PrwKJdvtTbJVdosRhS1O",
+        "verified_languages": [
+            "it",
+            "el",
+            "pt",
+            "fr",
+            "ar",
+            "ro",
+            "nl",
+            "pt",
+            "en",
+            "id",
+            "el",
+            "ta",
+            "fr",
+            "sv"
+        ]
+    },
+    "Sami 11LABS": {
+        "voice_id": "kAzI34nYjizE0zON6rXv",
+        "verified_languages": [
+            "fil",
+            "tr",
+            "cs",
+            "hr",
+            "ko",
+            "el",
+            "pt",
+            "en",
+            "it"
+        ]
+    },
     "MarcoTrox 11LABS": {
         "voice_id": "W71zT1VwIFFx3mMGH2uZ",
         "verified_languages": [
@@ -572,49 +635,61 @@ ELEVENLABS_VOICES_LIST = {
             "fr",
             "ar",
             "da",
-        ],
+            "ro",
+            "fil",
+            "tr",
+            "hu",
+            "ru",
+            "nl",
+            "hr",
+            "pt",
+            "id",
+            "el",
+            "ta"
+        ]
     },
     "Emilia 11LABS": {
         "voice_id": "Dt2jDzhoZC0pZw5bmy2S",
-        "verified_languages": ["en", "pt", "it", "es", "cs", "pl", "hi", "fr"],
-    },
-    "Rachel 11LABS": {"voice_id": "21m00Tcm4TlvDq8ikWAM", "verified_languages": []},
-    "Drew 11LABS": {"voice_id": "29vD33N1CtxCmqQRPOHJ", "verified_languages": []},
-    "Clyde 11LABS": {"voice_id": "2EiwWnXFnvU5JabPnv8n", "verified_languages": []},
-    "Paul 11LABS": {"voice_id": "5Q0t7uMcjvnagumLfvZi", "verified_languages": []},
-    "Aria 11LABS": {
-        "voice_id": "9BWtsMINqrJLrRacOk9x",
         "verified_languages": [
             "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "fr",
-            "zh",
-            "tr",
-        ],
-    },
-    "Domi 11LABS": {"voice_id": "AZnzlk1XvdvUeBnXmlld", "verified_languages": []},
-    "Dave 11LABS": {"voice_id": "CYw3kZ02Hs0563khs1Fj", "verified_languages": []},
-    "Roger 11LABS": {
-        "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
-        "verified_languages": [
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "fr",
-            "de",
-            "nl",
+            "pt",
+            "it",
             "es",
-        ],
+            "cs",
+            "pl",
+            "hi",
+            "fr",
+            "tr",
+            "hi",
+            "ms",
+            "cs",
+            "sk",
+            "el",
+            "fr",
+            "sv"
+        ]
     },
+    "Rachel 11LABS": {
+        "voice_id": "21m00Tcm4TlvDq8ikWAM",
+        "verified_languages": []
+    },
+    "Drew 11LABS": {
+        "voice_id": "29vD33N1CtxCmqQRPOHJ",
+        "verified_languages": []
+    },
+    "Clyde 11LABS": {
+        "voice_id": "2EiwWnXFnvU5JabPnv8n",
+        "verified_languages": [
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en",
+            "en"
+        ]
+    }
 }
 
 LANGUAGE_CODE_IN_THREE_LETTERS = {
