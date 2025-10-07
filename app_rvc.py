@@ -1,13 +1,23 @@
 import gradio as gr
 from soni_translate.logging_setup import (
+    configure_logging_libs,
     logger,
     set_logging_level,
-    configure_logging_libs,
-); configure_logging_libs() # noqa
+)
 import whisperx
 import torch
 import os
-from soni_translate.audio_segments import create_translated_audio
+from soni_translate.llm_fit import (
+    per_segment_budgets,
+    llm_fit
+)
+from soni_translate.audio_segments import (
+    create_translated_audio,
+    generate_segment_based_volume_automation,
+    mix_audio_volume,
+    mix_audio_segment_ducking,
+    mix_audio_sidechain
+)
 from soni_translate.text_to_speech import (
     audio_segmentation_to_voice,
     edge_tts_voices_list,
@@ -98,6 +108,8 @@ import time
 import hashlib
 import sys
 
+configure_logging_libs() 
+
 directories = [
     "downloads",
     "logs",
@@ -164,6 +176,7 @@ class SoniTrCache:
             'break_align': [],
             'diarize': [],
             'translate': [],
+            'llm_fit': [],
             'subs_and_edit': [],
             'tts': [],
             'acc_and_vc': [],
@@ -178,6 +191,7 @@ class SoniTrCache:
             'break_align': [],
             'diarize': [],
             'translate': [],
+            'llm_fit': [],
             'subs_and_edit': [],
             'tts': [],
             'acc_and_vc': [],
@@ -435,6 +449,7 @@ class SoniTranslate(SoniTrCache):
         segment_duration_limit=15,
         diarization_model="pyannote_3.1",
         translate_process="deep_translator",
+        llm_fit_process="tighten_and_fit",
         subtitle_file=None,
         output_type="video (mp4)",
         voiceless_track=False,
@@ -828,6 +843,50 @@ class SoniTranslate(SoniTrCache):
                     source=lang_source,
                 )
                 logger.debug("Translation complete")
+            
+            # Fitting with LLM (the cache options are probably not working properly)
+            if not self.task_in_cache("llm_fit", [
+                TRANSLATE_AUDIO_TO,
+                llm_fit_process
+            ], {
+                "result_diarize": self.result_diarize
+            }):
+                prog_disp("Fitting with LLM...", 0.75, is_gui, progress=progress)
+
+                lang_source = (
+                    self.align_language
+                    if self.align_language
+                    else SOURCE_LANGUAGE
+                )
+
+                # Calculate budgets
+                budgets = per_segment_budgets(
+                    src_segments=self.result_source_lang["segments"],
+                    tgt_segments=self.result_diarize["segments"],
+                    cps_cap=19.0,
+                    safety=0.90,
+                    default_r=1.15,
+                )
+
+                llm_fit_result = llm_fit(
+                    src_segments=self.result_source_lang["segments"],
+                    tgt_segments=self.result_diarize["segments"],
+                    budgets=budgets,
+                    task_mode=llm_fit_process,
+                    target_lang=TRANSLATE_AUDIO_TO,
+                    source_lang=lang_source,
+                    temperature=0.25,
+                    max_retries=0,
+                    # style_notes=[
+                    #     "Neutral, informative tone.",
+                    #     "Use numerals for numbers when natural.",
+                    # ],
+                    # model="openai/gpt-5",
+                    # model="google/gemini-2.5-pro",
+                )
+
+                self.result_diarize["segments"] = llm_fit_result.segments
+                logger.debug("LLM fit complete")
 
         if get_translated_text:
 
@@ -1093,21 +1152,72 @@ class SoniTranslate(SoniTrCache):
             volume_translated_audio,
             voiceless_track
         ], {}):
-            # TYPE MIX AUDIO
+
+            # Audio mixing dispatcher - calls appropriate mixing method
             remove_files(mix_audio_file)
-            command_volume_mix = f'ffmpeg -y -i {base_audio_wav} -i {dub_audio_file} -filter_complex "[0:0]volume={volume_original_audio}[a];[1:0]volume={volume_translated_audio}[b];[a][b]amix=inputs=2:duration=longest" -c:a libmp3lame {mix_audio_file}'
-            command_background_mix = f'ffmpeg -i {base_audio_wav} -i {dub_audio_file} -filter_complex "[1:a]asplit=2[sc][mix];[0:a][sc]sidechaincompress=threshold=0.003:ratio=20[bg]; [bg][mix]amerge[final]" -map [final] {mix_audio_file}'
-            if mix_method_audio == "Adjusting volumes and mixing audio":
-                # volume mix
-                run_command(command_volume_mix)
-            else:
-                try:
-                    # background mix
-                    run_command(command_background_mix)
-                except Exception as error_mix:
-                    # volume mix except
-                    logger.error(str(error_mix))
-                    run_command(command_volume_mix)
+
+            # Dispatch to appropriate mixing method
+            try:
+                if mix_method_audio == "Adjusting volumes and mixing audio":
+                    logger.info("Mix: Using volume mix")
+                    mix_audio_volume(
+                        base_audio_wav,
+                        dub_audio_file,
+                        mix_audio_file,
+                        volume_original_audio,
+                        volume_translated_audio,
+                    )
+                elif mix_method_audio == "Segment-based ducking (precise timing)":
+                    logger.info("Mix: Using segment-based ducking")
+
+                    # Generate volume automation filter from segments
+                    # There could be a problem with timing if we slow down or accelerate
+                    # segments (accelerate_segments)
+
+                    duck_level = volume_original_audio  # Original volume as duck level
+                    fade_duration = 0.5  # Duration of fade in/out
+                    volume_automation = generate_segment_based_volume_automation(
+                        self.result_diarize["segments"], 
+                        duck_level, 
+                        fade_duration
+                    )
+                    mix_audio_segment_ducking(
+                        base_audio_wav,
+                        dub_audio_file,
+                        mix_audio_file,
+                        volume_original_audio,
+                        volume_translated_audio,
+                        volume_automation
+                    )
+                elif mix_method_audio == "Mixing audio with sidechain compression":
+                    logger.info("Mix: Using sidechain compression")
+                    mix_audio_sidechain(
+                        base_audio_wav,
+                        dub_audio_file,
+                        mix_audio_file,
+                        volume_original_audio,
+                        volume_translated_audio,
+                    )
+                else:
+                    logger.error(f"Mix: Unknown mix method: {mix_method_audio}")
+                    logger.info("Mix: Falling back to volume mix")
+                    mix_audio_volume(
+                        base_audio_wav,
+                        dub_audio_file,
+                        mix_audio_file,
+                        volume_original_audio,
+                        volume_translated_audio,
+                    )
+            except Exception as error_mix:
+                logger.error(f"Mix: Audio mixing failed: {str(error_mix)}")
+                logger.info("Mix: Falling back to volume mix")
+                mix_audio_volume(
+                    base_audio_wav,
+                    dub_audio_file,
+                    mix_audio_file,
+                    volume_original_audio,
+                    volume_translated_audio,
+                )
 
         if "audio" in output_type or is_audio_file(media_file):
             output = media_out(
@@ -1781,6 +1891,7 @@ def create_gui(theme, logs_in_gui=False):
                             audio_mix_options = [
                                 "Mixing audio with sidechain compression",
                                 "Adjusting volumes and mixing audio",
+                                "Segment-based ducking (precise timing)",
                             ]
                             AUDIO_MIX = gr.Dropdown(
                                 audio_mix_options,
