@@ -35,8 +35,21 @@ def setup_logger(name_log):
     logger = logging.getLogger(name_log)
     logger.setLevel(logging.INFO)
 
-    _default_handler = logging.StreamHandler()  # Set sys.stderr as stream.
-    _default_handler.flush = sys.stderr.flush
+    # Detect if running in a notebook
+    try:
+        from IPython import get_ipython
+        in_notebook = get_ipython() is not None
+    except ImportError:
+        in_notebook = False
+
+    # Use stdout for notebooks, stderr for regular scripts
+    if in_notebook:
+        stream = sys.stdout
+    else:
+        stream = sys.stderr
+
+    _default_handler = logging.StreamHandler(stream)
+    _default_handler.flush = stream.flush
     logger.addHandler(_default_handler)
 
     logger.propagate = False
@@ -46,8 +59,6 @@ def setup_logger(name_log):
     for handler in handlers:
         formatter = logging.Formatter("[%(levelname)s] >> %(message)s")
         handler.setFormatter(formatter)
-
-    # logger.handlers
 
     return logger
 
