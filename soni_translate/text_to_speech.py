@@ -114,23 +114,25 @@ def pad_array(array, sr):
 
 
 def edge_tts_voices_list():
+    # Update for edge-tts-7.2.3
     try:
         completed_process = subprocess.run(
             ["edge-tts", "--list-voices"], capture_output=True, text=True
         )
         lines = completed_process.stdout.strip().split("\n")
+        # remove the first 2 lines
+        lines = lines[2:]
     except Exception as error:
         logger.debug(str(error))
         lines = []
 
     voices = []
     for line in lines:
-        if line.startswith("Name: "):
-            voice_entry = {}
-            voice_entry["Name"] = line.split(": ")[1]
-        elif line.startswith("Gender: "):
-            voice_entry["Gender"] = line.split(": ")[1]
-            voices.append(voice_entry)
+        content = line.split()
+        voice_entry = {}
+        voice_entry["Name"] = content[0]
+        voice_entry["Gender"] = content[1]
+        voices.append(voice_entry)
 
     formatted_voices = [
         f"{entry['Name']}-{entry['Gender']}" for entry in voices
@@ -165,7 +167,7 @@ def segments_egde_tts(filtered_edge_segments, TRANSLATE_AUDIO_TO, is_gui):
         filename = f"audio/{start}.ogg"
         temp_file = filename[:-3] + "mp3"
 
-        logger.info(f"{text} >> {filename}")
+        logger.debug(f"{text} >> {filename}")
         try:
             if is_gui:
                 asyncio.run(
@@ -946,18 +948,25 @@ def segments_openai_tts(
 # =====================================
 
 
-def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
+def segments_elevenlabs_tts(
+    filtered_elevenlabs_segments,
+    TRANSLATE_AUDIO_TO,
+    model_id="eleven_multilingual_v2",
+    sample_rate=44100,
+):
     from elevenlabs.client import ElevenLabs
     from elevenlabs import save
     import base64
 
     # API key is already an environment variable
-    client = ElevenLabs()
-    sample_rate = 24000
+    client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
-    # Only for model_id eleven_multilingual_v2
-    voice_settings = client.voices.settings.get_default().dict()
-    voice_settings['speed'] = 1.0
+    # Voice settings (only works for model_id eleven_multilingual_v2)
+    if model_id != "eleven_multilingual_v2":
+        voice_settings = client.voices.settings.get_default().dict()
+        voice_settings["speed"] = 1.0
+    else:
+        voice_settings = None
 
     segments = filtered_elevenlabs_segments["segments"]
 
@@ -967,71 +976,86 @@ def segments_elevenlabs_tts(filtered_elevenlabs_segments, TRANSLATE_AUDIO_TO):
         previous_text = segments[idx - 1]["text"] if idx > 0 else ""
         next_text = segments[idx + 1]["text"] if idx < len(segments) - 1 else ""
 
+        # Assign segment variables
         speaker = segment["speaker"]
         text = segment["text"].strip()
         start = segment["start"]
         tts_name = segment["tts_name"]
         voice_id = ELEVENLABS_VOICES_LIST[tts_name]["voice_id"]
 
-        logger.info(f"{str(segment)[:60]}...{str(segment)[-60:]}")
-
         # make the tts audio
         filename = f"audio/{start}.wav"
         # filename = f"audio/{start}.ogg"
-        temp_file = f"audio/{start}.pcm"
+        # temp_file = f"audio/{start}.pcm"
 
-        logger.info(f"{speaker} | {tts_name} | {text} >> {filename}")
+        logger.debug(f"{speaker} -> {tts_name} | '{text}' >> {filename}")
 
         try:
 
-            # audio = client.text_to_speech.convert(
-            #     text=text,
-            #     voice_id=voice_id,
-            #     model_id="eleven_multilingual_v2",
-            #     output_format=f"pcm_{sample_rate}",
-            #     previous_text=previous_text,
-            #     next_text=next_text
-            # )
+            # TODO: Apply recommended speed ?
 
-            # save(audio, temp_file)
-
-            results = client.text_to_speech.convert_with_timestamps(
+            # ----
+            # Generate audio
+            audio = client.text_to_speech.convert(
                 text=text,
                 voice_id=voice_id,
-                model_id="eleven_v3",
+                model_id=model_id,
                 output_format=f"pcm_{sample_rate}",
-                apply_text_normalization='on',
-                # previous_text=previous_text,
-                # next_text=next_text,
+                apply_text_normalization="on",
+                previous_text=previous_text,
+                next_text=next_text,
                 voice_settings=voice_settings,
-                seed=123456,
             )
+            # save(audio, filename)
+            # audio_bytes = b"".join(audio)
+            # save_bytes_as_wav(audio_bytes, filename, sample_rate)
 
-            # Duration
-            ets = results.alignment.character_end_times_seconds
-            duration = ets[len(ets) - 1]
-            logger.info(f"Duration: {duration}")
+            audio_bytes = b"".join(audio)
+            save_bytes_as_wav(audio_bytes, filename, sample_rate)
 
-            audio = base64.b64decode(results.audio_base_64)
-            with open(temp_file, "wb") as f:
-                f.write(audio)
+            # audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+            # trimmed_np = trim_last_seconds_np(audio_np, sample_rate, seconds=0.2)
+            # save_bytes_as_wav(trimmed_np.tobytes(), filename, sample_rate)
 
-            # Read the raw PCM data
-            pcm_data = np.fromfile(temp_file, dtype=np.int16)
+            # # Write WAV file header and data
+            # with wave.open(filename, "wb") as wav_file:
+            #     wav_file.setnchannels(1)  # mono (ElevenLabs outputs mono)
+            #     wav_file.setsampwidth(2)  # 16-bit PCM = 2 bytes/sample
+            #     wav_file.setframerate(sample_rate)
+            #     wav_file.writeframes(audio_bytes)
+            # ----
 
-            # Save the PCM data as a WAV file
-            save_np_as_wav(pcm_data, filename)
-
-            # data = pad_array(pcm_data, sample_rate)
-            # # Save file
-            # write_chunked(
-            #     file=filename,
-            #     samplerate=sample_rate,
-            #     data=data,
-            #     format="ogg",
-            #     subtype="vorbis",
+            # # ----
+            # # Generate audio with timestamps
+            # results = client.text_to_speech.convert_with_timestamps(
+            #     text=text,
+            #     voice_id=voice_id,
+            #     model_id=model_id,
+            #     output_format=f"pcm_{sample_rate}",
+            #     apply_text_normalization='on',
+            #     previous_text=previous_text,
+            #     next_text=next_text,
+            #     voice_settings=voice_settings,
             # )
-            # verify_saved_file_and_size(filename)
+
+            # # Duration
+            # ets = results.alignment.character_end_times_seconds
+            # duration = ets[len(ets) - 1]
+            # logger.debug(f"Duration: {duration}")
+
+            # audio_bytes = base64.b64decode(results.audio_base_64)
+
+            # save_bytes_as_wav(audio_bytes, filename, sample_rate)
+
+            # # Write WAV file header and data
+            # with wave.open(filename, "wb") as wav_file:
+            #     wav_file.setnchannels(1)          # mono (ElevenLabs outputs mono)
+            #     wav_file.setsampwidth(2)          # 16-bit PCM = 2 bytes/sample
+            #     wav_file.setframerate(sample_rate)
+            #     wav_file.writeframes(audio_bytes)
+            # # ----
+
+            verify_saved_file_and_size(filename)
 
         except Exception as error:
             error_handling_in_tts(error, segment, TRANSLATE_AUDIO_TO, filename)
@@ -1081,6 +1105,7 @@ def audio_segmentation_to_voice(
     dereverb_automatic=True,
     model_id_bark="suno/bark-small",
     model_id_coqui="tts_models/multilingual/multi-dataset/xtts_v2",
+    model_id_elevenlabs="eleven_multilingual_v2",
     delete_previous_automatic=True,
 ):
 
@@ -1175,7 +1200,11 @@ def audio_segmentation_to_voice(
         segments_openai_tts(filtered_openai_tts, TRANSLATE_AUDIO_TO)  # wav
     if filtered_elevenlabs["segments"]:
         logger.info(f"ElevenLabs TTS: {speakers_elevenlabs}")
-        segments_elevenlabs_tts(filtered_elevenlabs, TRANSLATE_AUDIO_TO)  # wav
+        segments_elevenlabs_tts(
+            filtered_elevenlabs,
+            TRANSLATE_AUDIO_TO,
+            model_id_elevenlabs,
+        )  # wav
 
     [result.pop("tts_name", None) for result in result_diarize["segments"]]
     return [
@@ -1674,13 +1703,26 @@ def toneconverter(
                 )
 
 # Save numpy as wave
-def save_np_as_wav(array, output_path):
+def save_bytes_as_wav(audio_bytes, output_path, samplerate=24000):
     with wave.open(output_path, 'wb') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)  # 16-bit = 2 bytes
-        wf.setframerate(24000)
-        wf.writeframes(array.tobytes())
+        wf.setnchannels(1)  # mono (ElevenLabs outputs mono)
+        wf.setsampwidth(2)  # 16-bit PCM = 2 bytes/sample
+        wf.setframerate(samplerate)
+        wf.writeframes(audio_bytes)
     return
+
+def trim_last_seconds_np(array: np.ndarray, samplerate: int, seconds: float = 0.1) -> np.ndarray:
+    """
+    Remove the last `seconds` seconds from a 1-D or 2-D numpy audio array.
+    """
+    if seconds <= 0:
+        return array
+    samples_to_cut = int(round(seconds * samplerate))
+    if samples_to_cut <= 0:
+        return array
+    if array.size <= samples_to_cut:
+        return np.zeros((0,), dtype=array.dtype)
+    return array[:-samples_to_cut]
 
 if __name__ == "__main__":
     from segments import result_diarize

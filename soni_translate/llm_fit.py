@@ -15,13 +15,21 @@ from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 
 # Local
-from .llm_fit_configuration import SYSTEM_PROMPT_TMPL, PUNCT_COST
+from .llm_fit_configuration import (
+    PUNCT_COST,
+    SYSTEM_PROMPT_TMPL_TIGHTEN_AND_FIT,
+    SYSTEM_PROMPT_TMPL_TRANSLATE_AND_FIT,
+)
 from .logging_setup import logger
 
 LLM_FIT_OPTIONS = [
     "translate_and_fit",
     "tighten_and_fit",
+    "disable",
 ]
+
+LLM_FIT_MODELS = ["openai/gpt-5-mini", "openai/gpt-5", "google/gemini-2.5-pro"]
+
 
 # -------------------------------
 # Character cost / CPS utilities
@@ -47,6 +55,123 @@ def cps(text: str, start: float, end: float, use_weighted: bool = False) -> floa
     return float(L) / dur
 
 
+# -------------------------------
+# Segment selection utilities
+# -------------------------------
+
+
+def select_segments_within_budget(
+    budgets: Optional[List[Dict[str, Any]]],
+    segments_fitted: Optional[List[Dict[str, Any]]],
+    segments_translated: Optional[List[Dict[str, Any]]],
+    threshold: float = 0.95,
+    budget_key: str = "char_src",
+    buffer_threshold_s: Optional[float] = None,
+    buffer_key: str = "buffer",
+    buffer_override_max_ratio: Optional[float] = None,
+) -> Tuple[List[Dict[str, Any]], int, int]:
+    """
+    Select between a fitted and a translated segment using a per-segment budget.
+
+    Rules:
+        1. Buffer override:
+           If a time buffer exists (budget[buffer_key] >= buffer_threshold_s),
+           prefer the translated segment as long as its weighted length does not
+           exceed (budget * buffer_override_max_ratio). If max_ratio is None,
+           the override is unconditional.
+
+        2. Budget rule:
+           Otherwise, pick the translated segment only if:
+               weighted_len(translated) < budget * threshold
+           Else use the fitted one.
+
+        3. Fallback:
+           If budgets or segments are missing, return the fitted list unchanged.
+
+    Returns:
+        (selected_segments, total_count, translated_used_count)
+    """
+    if not (budgets and segments_fitted and segments_translated):
+        return segments_fitted or [], 0, 0
+
+    selected_segments: List[Dict[str, Any]] = []
+    total_count = 0
+    translated_used_count = 0
+
+    zip_object = zip(segments_fitted, segments_translated, budgets)
+    for seg_fit, seg_trans, budget in zip_object:
+        total_count += 1
+
+        limit = float(budget.get(budget_key)) if isinstance(budget, dict) else None
+        buffer_val = float(budget.get(buffer_key)) if isinstance(budget, dict) else None
+
+        wl_trans = weighted_len(seg_trans.get("text", ""))
+        wl_fit = weighted_len(seg_fit.get("text", ""))
+
+        # ------------------------------------------------------------------
+        # Buffer override: prefer translated if we have enough time buffer.
+        # Safeguard: translated must be <= limit * buffer_override_max_ratio
+        # (unless the ratio is None → unconditional override).
+        # ------------------------------------------------------------------
+        buffer_override_allowed = (
+            buffer_threshold_s is not None
+            and buffer_val is not None
+            and buffer_val >= float(buffer_threshold_s)
+        )
+
+        if buffer_override_allowed and limit is not None:
+            within_ratio = (
+                buffer_override_max_ratio is None
+                or wl_trans <= limit * float(buffer_override_max_ratio)
+            )
+
+            if within_ratio:
+                logger.debug(
+                    f"buffer override: buffer={buffer_val:.2f}s >= {float(buffer_threshold_s):.2f}s "
+                    f"and wl_trans={wl_trans} <= {limit} * {buffer_override_max_ratio} -> using translated"
+                )
+                logger.debug(f"tra. text: {seg_trans.get('text', '')}")
+                logger.debug(f"fit. text: {seg_fit.get('text', '')}")
+
+                if isinstance(budget, dict):
+                    logger.debug(
+                        f"budget (src/tgt/budget/buffer): "
+                        f"{budget.get('char_src')} / {budget.get('char_tgt')} / "
+                        f"{budget.get('char_budget')} / {budget.get('buffer')}"
+                    )
+
+                selected_segments.append(seg_trans)
+                translated_used_count += 1
+                continue
+
+            else:
+                logger.debug(
+                    f"buffer override skipped: buffer={buffer_val:.2f}s, wl_trans={wl_trans}, "
+                    f"limit={limit}, max_ratio={buffer_override_max_ratio}"
+                )
+
+        # ------------------------------------------------------------------
+        # Standard budget rule:
+        # Choose translated only if it's strictly below (limit * threshold).
+        # ------------------------------------------------------------------
+        if limit is not None and wl_trans < limit * float(threshold):
+            logger.debug(f"tra. text: {seg_trans.get('text', '')}")
+            logger.debug(f"fit. text: {seg_fit.get('text', '')}")
+            logger.debug(f"weighted_len (translated / fitted): {wl_trans} / {wl_fit}")
+
+            if isinstance(budget, dict):
+                logger.debug(
+                    f"budget (src / tgt): {budget.get('char_src')} / {budget.get('char_tgt')}"
+                )
+
+            selected_segments.append(seg_trans)
+            translated_used_count += 1
+        else:
+            selected_segments.append(seg_fit)
+
+    return selected_segments, total_count, translated_used_count
+
+
 # ---------------------------------------------
 # Per-segment budgets from timing + source EN
 # ---------------------------------------------
@@ -56,10 +181,11 @@ def per_segment_budgets(
     src_segments: List[Dict[str, Any]],  # [{'start','end','text'}] in SOURCE language
     tgt_segments: Optional[
         List[Dict[str, Any]]
-    ] = None,  # optional post-MT target to estimate expansion ratio
+    ] = None,  # optional target to estimate expansion ratio
     cps_cap: float = 19.0,  # upper cap for Latin scripts; use ~10–11 for CJK, ~16–18 AR/HE
     safety: float = 0.95,  # 5% margin
     default_r: float = 1.15,  # fallback expansion ratio (e.g., EN->IT ~1.1–1.2)
+    media_duration: Optional[float] = None,  # optional media duration
 ) -> List[Dict[str, Any]]:
     """
     Returns a list with per-line cps_tgt and characters_budget (weighted chars).
@@ -84,26 +210,39 @@ def per_segment_budgets(
     # 2) compute per-line budgets
     budgets: List[Dict[str, Any]] = []
     for i, seg in enumerate(src_segments):
+
         # Start and end times
         start = float(seg["start"])
         end = float(seg["end"])
-        next_start = (
-            float(src_segments[i + 1]["start"]) if i < len(src_segments) - 1 else end
-        )
+
+        # Determine the start time of the next segment
+        if i < len(src_segments) - 1:
+            next_start = float(src_segments[i + 1].get("start", end))
+        else:
+            # For the last segment, prefer media_duration (if provided) otherwise use end
+            next_start = float(media_duration) if media_duration is not None else end
+        # Guard against overlapping or misordered timestamps so buffer is never negative
+        if next_start < end:
+            next_start = end
+
         # Duration and buffer
         duration = max(0.001, end - start)
         buffer = max(0.001, next_start - end)
+
         # Ratio
         ratio = ratios[i] if ratios else 0
+
         # CPS
         cps_src = weighted_len(seg["text"]) / duration
         cps_tgt = cps_src * ratios[i] if ratios else 0
         cps_tgt_i = min(cps_cap, cps_src * r * safety)
+
         # Characters
         char_src = weighted_len(seg["text"])
         char_tgt = int(weighted_len(seg["text"]) * ratios[i]) if ratios else 0
         char_budget = int(cps_tgt_i * duration)
         duration_tgt = char_budget / cps_tgt_i
+
         budget = {
             "index": i,
             "start": start,
@@ -208,11 +347,28 @@ def llm_fit(
     Returns chosen text per segment + diagnostics.
     """
 
+    if task_mode not in LLM_FIT_OPTIONS:
+        raise ValueError(f"task_mode must be one of {LLM_FIT_OPTIONS}.")
+
+    # if task_mode is "disable" then return the source segments
+    if task_mode == "disable":
+        return LLMFitResult(
+            segments=tgt_segments or src_segments,
+            diagnostics=[],
+            model=model,
+            budgets=budgets,
+        )
+
+    # API key
     if openai_api_key is None:
         openai_api_key = os.getenv("OPENROUTER_API_KEY")
 
-    if task_mode != "translate_and_fit" and task_mode != "tighten_and_fit":
-        raise ValueError("task_mode must be 'translate_and_fit' or 'tighten_and_fit'")
+    # Prepare custom headers for OpenRouter (optional)
+    headers = {}
+    if os.getenv("OPENROUTER_SITE_URL"):
+        headers["HTTP-Referer"] = os.getenv("OPENROUTER_SITE_URL")
+    if os.getenv("OPENROUTER_SITE_NAME"):
+        headers["X-Title"] = os.getenv("OPENROUTER_SITE_NAME")
 
     # Zip source & target segments
     zip_segments = (
@@ -250,7 +406,7 @@ def llm_fit(
     # Prepare JsonOutputParser with Pydantic schema
     parser = JsonOutputParser(pydantic_object=LLMResponse)
     format_instructions = parser.get_format_instructions()
-    # logger.info(format_instructions)
+    # logger.debug(format_instructions)
 
     reasoning = {
         "effort": "medium",  # 'low', 'medium', or 'high'
@@ -265,6 +421,7 @@ def llm_fit(
         base_url="https://openrouter.ai/api/v1",
         model=model,
         temperature=temperature,
+        default_headers=headers,
         # use_responses_api=True,
         # seed=1,
         # reasoning=reasoning,
@@ -273,29 +430,24 @@ def llm_fit(
         # model_kwargs={"temperature": temperature}
     )
 
-    # prompt = "What's bigger, 9.9 or 9.11? Explain your reasoning"
-    # try:
-    #     response = llm.invoke(prompt)
-    #     return response
-    # except Exception as e:
-    #     # Log the error or handle it gracefully
-    #     logger.info(f"Error during invocation: {e}")
-    #     # Return a fallback message or retry logic here
-    #     return "Sorry, something went wrong while processing your request."
-
     # Prepare messages with format instructions
+    system_message = (
+        SYSTEM_PROMPT_TMPL_TIGHTEN_AND_FIT
+        if task_mode == "tighten_and_fit"
+        else SYSTEM_PROMPT_TMPL_TRANSLATE_AND_FIT
+    )
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT_TMPL + "\n\n" + format_instructions),
+        SystemMessage(content=system_message + "\n\n" + format_instructions),
         HumanMessage(content=json.dumps(user_payload, ensure_ascii=False)),
     ]
-    # logger.info(messages)
+    # logger.debug(messages)
 
     # Parse with JsonOutputParser and retry if needed
     last_err: Optional[Exception] = None
     for _ in range(max_retries + 1):
         response = llm.invoke(messages)
         text = (response.content or "").strip()
-        # logger.info(f"LLM response: {text}")
+        # logger.debug(f"LLM response: {text}")
         try:
             parsed = parser.parse(text)  # returns LLMResponse (Pydantic model)
             # parsed = json_repair.loads(parsed)
@@ -311,19 +463,25 @@ def llm_fit(
     diagnostics: List[Dict[str, Any]] = []
 
     segments_out = data["segments"]
+
+    # Debug
     for segment_out, src_segment in zip(segments_out, src_segments):
-        logger.info("---")
+        logger.debug("---")
         s = src_segment["text"].strip()
         for candidate in segment_out.get("candidates", []):
             t = candidate.get("text", "").strip()
             n = candidate.get("notes", "").strip()
             i = segment_out["index"]
-            logger.info(f"Segment {i}\nsource:\t\t{s}\ncandidate:\t{t}\nnotes:\t\t{n}")
+            logger.debug(f"Segment {i}")
+            logger.debug(f"source:\t\t{s}")
+            logger.debug(f"candidate:\t{t}")
+            logger.debug(f"notes:\t\t{n}")
 
-    for i, (segment_out, budget, original) in enumerate(
+    for i, (segment_out, budget, src_segment) in enumerate(
         zip(segments_out, budgets, src_segments)
     ):
         start, end = float(segment_out["start"]), float(segment_out["end"])
+        speaker = src_segment.get("speaker", "")
         duration = max(0.001, end - start)
         budget_w = int(budget["char_budget"])
 
@@ -376,6 +534,7 @@ def llm_fit(
                 "start": start,
                 "end": end,
                 "text": chosen_text,
+                "speaker": speaker,
             }
         )
 
@@ -389,7 +548,7 @@ def llm_fit(
                 "cps_weighted": round(cps_w, 2),
                 "notes": chosen_notes,
                 "speed_suggestion_for_elevenlabs": speed_suggestion,
-                "original_text": original["text"],
+                "original_text": src_segment["text"],
             }
         )
 

@@ -431,16 +431,17 @@ def translate_text(
     token_batch_limit=1000,
 ):
     """Translates text segments using a specified process."""
+    # Determine result first, then log and return
     match translation_process:
         case "google_translator_batch":
-            return translate_batch(
+            translated = translate_batch(
                 segments,
                 fix_code_language(target),
                 chunk_size,
                 fix_code_language(source)
             )
         case "google_translator":
-            return translate_iterative(
+            translated = translate_iterative(
                 segments,
                 fix_code_language(target),
                 fix_code_language(source)
@@ -448,11 +449,11 @@ def translate_text(
         case "deepl_translator":
             deepl_client = deepl_init_client()
             glossary_id, _ = deepl_get_glossary_id(source, target, deepl_client)
-            return translate_iterative_deepl(segments, target, source, glossary_id, deepl_client)
+            translated = translate_iterative_deepl(segments, target, source, glossary_id, deepl_client)
         case model if model in ["gpt-3.5-turbo-0125", "gpt-4-turbo-preview"]:
-            return gpt_sequential(segments, model, target, source)
+            translated = gpt_sequential(segments, model, target, source)
         case model if model in ["gpt-3.5-turbo-0125_batch", "gpt-4-turbo-preview_batch",]:
-            return gpt_batch(
+            translated = gpt_batch(
                 segments,
                 translation_process.replace("_batch", ""),
                 target,
@@ -460,9 +461,11 @@ def translate_text(
                 source
             )
         case "disable_translation":
-            return segments
+            translated = segments
         case _:
             raise ValueError("No valid translation process")
+
+    return translated
 
 def deepl_init_client():
     auth_key = os.getenv("DEEPL_API_KEY")

@@ -212,3 +212,5 @@ WHISPER_MODELS/
 whisper_api_audio_parts/
 uroman/
 pdf_images/
+.cache
+soni_translate/parkplatz

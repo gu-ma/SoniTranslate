@@ -559,7 +559,438 @@ OPENAI_TTS_MODELS = [
 ]
 
 ELEVENLABS_VOICES_LIST = {
-    "Oliver 11LABS": {
+    "Piero Italia 11LABS": {
+        "voice_id": "slEjHpiFudesZaivDTNt",
+        "verified_languages": []
+    },
+    "Cinnamon 11LABS": {
+        "voice_id": "kNie5n4lYl7TrvqBZ4iG",
+        "verified_languages": [
+            "en",
+            "es",
+            "it",
+            "pl",
+            "pt",
+            "ko",
+            "ru",
+            "sk",
+            "pt",
+            "ro",
+            "ru"
+        ]
+    },
+    "Angelina 11LABS": {
+        "voice_id": "MLpDWJvrjFIdb63xbJp8",
+        "verified_languages": []
+    },
+    "Alessandro 11LABS": {
+        "voice_id": "PSp7S6ST9fDNXDwEzX0m",
+        "verified_languages": []
+    },
+    "Thomas 11LABS": {
+        "voice_id": "MU9G8HOuEgdhUELfPshS",
+        "verified_languages": [
+            "es",
+            "pt",
+            "en"
+        ]
+    },
+    "GianP 11LABS": {
+        "voice_id": "nNt0YcINdGadGcTx5fBM",
+        "verified_languages": [
+            "es",
+            "hi",
+            "pl",
+            "pt",
+            "el",
+            "bg",
+            "fr",
+            "ar",
+            "fil",
+            "tr",
+            "hu",
+            "ro",
+            "nl",
+            "ko",
+            "pt",
+            "id",
+            "sv",
+            "no"
+        ]
+    },
+    "Violetta 11LABS": {
+        "voice_id": "gfKKsLN1k0oYYN9n2dXX",
+        "verified_languages": [
+            "pl",
+            "en",
+            "ko",
+            "es",
+            "fil",
+            "hu",
+            "tr",
+            "hi",
+            "ko",
+            "hr",
+            "nl",
+            "id",
+            "pt",
+            "fr",
+            "pl",
+            "sk",
+            "ta",
+            "it",
+            "es",
+            "ru",
+            "da"
+        ]
+    },
+    "Jessica Anne Bogart 11LABS": {
+        "voice_id": "g6xIsTj2HwM6VR4iXFCw",
+        "verified_languages": [
+            "de",
+            "pl",
+            "ar",
+            "hu",
+            "hi",
+            "cs",
+            "pt",
+            "sk",
+            "pl",
+            "ta",
+            "fr",
+            "ja",
+            "it",
+            "da"
+        ]
+    },
+    "Cassidy 11LABS": {
+        "voice_id": "56AoDkrOh6qfVPDXZ7Pt",
+        "verified_languages": [
+            "hi",
+            "pt",
+            "ro",
+            "hr",
+            "id",
+            "fil",
+            "hr",
+            "sk",
+            "pt",
+            "ta",
+            "it"
+        ]
+    },
+    "Enniah 11LABS": {
+        "voice_id": "WHaUUVTDq47Yqc9aDbkH",
+        "verified_languages": [
+            "hr",
+            "es",
+            "tr",
+            "de",
+            "it",
+            "nl",
+            "pt",
+            "el",
+            "hi",
+            "cs",
+            "ru",
+            "ro",
+            "sv",
+            "ko",
+            "en",
+            "ta",
+            "es",
+            "en",
+            "it"
+        ]
+    },
+    "Nichalia Schwartz 11LABS": {
+        "voice_id": "acCWxmzPBgXdHwA63uzP",
+        "verified_languages": [
+            "es",
+            "de",
+            "cs",
+            "it",
+            "pl",
+            "ja",
+            "hi",
+            "el",
+            "tr",
+            "hu",
+            "ko",
+            "pt",
+            "sk",
+            "ta",
+            "fr",
+            "sv",
+            "hr",
+            "no"
+        ]
+    },
+    "Arabella 11LABS": {
+        "voice_id": "Z3R5wn05IrDiVCyEkUrK",
+        "verified_languages": [
+            "cs",
+            "pt",
+            "de",
+            "pl",
+            "hi",
+            "tr",
+            "hu",
+            "nl",
+            "ko",
+            "pt",
+            "cs",
+            "sk",
+            "ta",
+            "fr",
+            "sv",
+            "it",
+            "no",
+            "da"
+        ]
+    },
+    "Eva Dorado 11LABS": {
+        "voice_id": "RgXx32WYOGrd7gFNifSf",
+        "verified_languages": [
+            "es",
+            "hi",
+            "it",
+            "el",
+            "cs",
+            "fr",
+            "hr",
+            "ar",
+            "tr",
+            "hi",
+            "ru",
+            "ro",
+            "ms",
+            "cs",
+            "id",
+            "hr",
+            "el",
+            "fr",
+            "sv",
+            "no"
+        ]
+    },
+    "Jon 11LABS": {
+        "voice_id": "MFZUKuGQUsGJPQjTS4wC",
+        "verified_languages": [
+            "pt",
+            "hi",
+            "en",
+            "ko",
+            "pl",
+            "es",
+            "it",
+            "ru",
+            "tr",
+            "pt",
+            "hi",
+            "sk",
+            "ro",
+            "hr",
+            "fr",
+            "ta",
+            "da",
+            "ru"
+        ]
+    },
+    "Antonio Farina 11LABS": {
+        "voice_id": "uScy1bXtKz8vPzfdFsFw",
+        "verified_languages": [
+            "de",
+            "hi",
+            "pt",
+            "ja",
+            "el",
+            "cs",
+            "bg",
+            "fr",
+            "hr",
+            "ar",
+            "hu",
+            "tr",
+            "hi",
+            "ru",
+            "ro",
+            "ms",
+            "pt",
+            "id",
+            "uk",
+            "sk",
+            "el",
+            "sv",
+            "fr",
+            "ta",
+            "es",
+            "no"
+        ]
+    },
+    "Nicola Lorusso 11LABS": {
+        "voice_id": "sKbNSlHXq99bttvf8rRF",
+        "verified_languages": [
+            "es",
+            "it",
+            "pl",
+            "pt",
+            "hi",
+            "el",
+            "hr",
+            "fr",
+            "ar",
+            "tr",
+            "hu",
+            "ro",
+            "cs",
+            "hr",
+            "pt",
+            "ta",
+            "sv",
+            "no"
+        ]
+    },
+    "Luca Brasi Intimo 11LABS": {
+        "voice_id": "JfjzwHPmCw6p6fdGVt4Y",
+        "verified_languages": [
+            "it",
+            "el",
+            "hi",
+            "es",
+            "ja",
+            "fr",
+            "ar",
+            "hr",
+            "id",
+            "fi",
+            "pt",
+            "en",
+            "el",
+            "hr",
+            "es"
+        ]
+    },
+    "Busy Bea 11LABS": {
+        "voice_id": "aHCytOTnUOgfGPn5n89j",
+        "verified_languages": [
+            "en",
+            "pt",
+            "hi",
+            "fr",
+            "el",
+            "fil",
+            "hu",
+            "tr",
+            "cs",
+            "ru",
+            "ro",
+            "hr",
+            "el",
+            "sk",
+            "pt",
+            "en",
+            "fr",
+            "ar",
+            "pl",
+            "sv",
+            "it",
+            "es"
+        ]
+    },
+    "Angela 11LABS": {
+        "voice_id": "lqydY2xVUkg9cEIFmFMU",
+        "verified_languages": [
+            "es",
+            "it",
+            "pl",
+            "hi",
+            "ru",
+            "el",
+            "tr",
+            "hu",
+            "ro",
+            "fi",
+            "nl",
+            "pt",
+            "cs",
+            "uk",
+            "el",
+            "sk",
+            "ta",
+            "sv",
+            "hr",
+            "no",
+            "da"
+        ]
+    },
+    "Regan 11LABS": {
+        "voice_id": "CRugt7r6KLDJbifthghJ",
+        "verified_languages": [
+            "pt",
+            "de",
+            "ru",
+            "tr",
+            "hu",
+            "ar",
+            "ko",
+            "pt",
+            "cs",
+            "sk",
+            "el",
+            "ta",
+            "fr",
+            "sv",
+            "hr",
+            "it",
+            "da"
+        ]
+    },
+    "Monsieur 11LABS": {
+        "voice_id": "xIct0eOp02Qo8rJRid7J",
+        "verified_languages": [
+            "pl",
+            "hi",
+            "ru",
+            "cs",
+            "ar",
+            "tr",
+            "hi",
+            "hu",
+            "ro",
+            "ko",
+            "nl",
+            "sv",
+            "hr",
+            "it",
+            "no",
+            "el",
+            "da"
+        ]
+    },
+    "Tomasz Zborek 11LABS": {
+        "voice_id": "g8ZOdhoD9R6eYKPTjKbE",
+        "verified_languages": [
+            "en",
+            "cs",
+            "es",
+            "ko",
+            "hr",
+            "ru",
+            "nl",
+            "id",
+            "sv",
+            "en",
+            "fr",
+            "pl",
+            "sk",
+            "uk",
+            "ta",
+            "it",
+            "da"
+        ]
+    },
+    "Oliver Haddington 11LABS": {
         "voice_id": "L1aJrPa7pLJEyYlh3Ilq",
         "verified_languages": [
             "hi",
@@ -585,11 +1016,11 @@ ELEVENLABS_VOICES_LIST = {
         "voice_id": "uV2Bhcm1HwmAqPqkbjfl",
         "verified_languages": []
     },
-    "Andrea 11LABS": {
+    "Andrea B. 11LABS": {
         "voice_id": "7WZPc0ZjFzsx74E5qoQV",
         "verified_languages": []
     },
-    "Mia 11LABS": {
+    "Mia Instructor 11LABS": {
         "voice_id": "PrwKJdvtTbJVdosRhS1O",
         "verified_languages": [
             "it",
@@ -669,26 +1100,42 @@ ELEVENLABS_VOICES_LIST = {
             "sv"
         ]
     },
-    "Rachel 11LABS": {
-        "voice_id": "21m00Tcm4TlvDq8ikWAM",
-        "verified_languages": []
-    },
-    "Drew 11LABS": {
-        "voice_id": "29vD33N1CtxCmqQRPOHJ",
-        "verified_languages": []
-    },
-    "Clyde 11LABS": {
-        "voice_id": "2EiwWnXFnvU5JabPnv8n",
+    "Carmelo La Rosa 11LABS": {
+        "voice_id": "HuK8QKF35exsCh2e7fLT",
         "verified_languages": [
+            "bg",
+            "cs",
+            "de",
+            "hi",
+            "it",
+            "el",
+            "pl",
+            "es",
+            "pt",
+            "fr",
+            "hr",
+            "id",
+            "ro",
+            "uk",
+            "hu",
+            "hi",
+            "ru",
+            "ro",
+            "nl",
+            "cs",
+            "hr",
+            "pt",
             "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en",
-            "en"
+            "sk",
+            "el",
+            "pl",
+            "fr",
+            "ta"
         ]
+    },
+    "BvW 11LABS": {
+        "voice_id": "TFylpNgMjmVNNqBK9XxN",
+        "verified_languages": []
     }
 }
 

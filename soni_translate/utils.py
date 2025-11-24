@@ -2,9 +2,12 @@ import os, zipfile, rarfile, shutil, subprocess, shlex, sys # noqa
 from .logging_setup import logger
 from urllib.parse import urlparse
 from IPython.utils import capture
-import re
+from pydub import AudioSegment
 import soundfile as sf
 import numpy as np
+import hashlib
+import json
+import re
 
 VIDEO_EXTENSIONS = [
     ".mp4",
@@ -48,7 +51,7 @@ SUBTITLE_EXTENSIONS = [
 
 
 def run_command(command):
-    logger.debug(command)
+    # logger.debug(command)
     if isinstance(command, str):
         command = shlex.split(command)
 
@@ -64,7 +67,7 @@ def run_command(command):
     if (
         process_command.returncode != 0
     ):  # or not os.path.exists(mono_path) or os.path.getsize(mono_path) == 0:
-        logger.error("Error comnand")
+        logger.error("Error command")
         raise Exception(errors.decode())
 
 
@@ -508,3 +511,112 @@ def rename_file(current_name, new_name):
     else:
         logger.error(f"File '{current_name}' does not exist.")
         return None
+
+
+def get_hash(filepath):
+    with open(filepath, 'rb') as f:
+        file_hash = hashlib.blake2b()
+        while chunk := f.read(8192):
+            file_hash.update(chunk)
+
+    return file_hash.hexdigest()[:18]
+
+
+# Log segments helper
+def log_segments(
+    segments,
+    other_segments=None,
+    title: str = "Segments:",
+    include_speaker: bool = True,
+):
+    """
+    Safe debug logger for segment lists.
+
+    - segments: primary list (usually source or final segments)
+    - other_segments: optional list to zip with segments (e.g. source vs translated)
+    - title: header text written once
+    - include_speaker: include 'speaker' field if present
+    """
+    try:
+        # safe counts
+        try:
+            orig_count = len(segments) if segments is not None else 0
+        except Exception:
+            orig_count = 0
+        try:
+            other_count = len(other_segments) if other_segments is not None else None
+        except Exception:
+            other_count = None
+
+        logger.info(f"{title} (count: {orig_count}" + (f" vs {other_count}" if other_count is not None else "") + ")")
+
+        if other_segments is not None:
+            iterator = zip(segments, other_segments)
+            for src, res in iterator:
+                start = src.get("start", res.get("start", 0))
+                end = src.get("end", res.get("end", 0))
+                speaker = src.get("speaker", res.get("speaker", "")) if include_speaker else ""
+                src_text = src.get("text", "")
+                res_text = res.get("text", "")
+                try:
+                    s_fmt = f"{float(start):0.2f}"
+                except Exception:
+                    s_fmt = str(start)
+                try:
+                    e_fmt = f"{float(end):0.2f}"
+                except Exception:
+                    e_fmt = str(end)
+                logger.debug(f"[{s_fmt} --> {e_fmt}] {speaker}".rstrip())
+                logger.debug(f"Source: {src_text}")
+                logger.debug(f"Result: {res_text}")
+        else:
+            for segment in segments:
+                start = segment.get("start", 0)
+                end = segment.get("end", 0)
+                speaker = segment.get("speaker", "") if include_speaker else ""
+                text = segment.get("text", "")
+                try:
+                    s_fmt = f"{float(start):0.2f}"
+                except Exception:
+                    s_fmt = str(start)
+                try:
+                    e_fmt = f"{float(end):0.2f}"
+                except Exception:
+                    e_fmt = str(end)
+                logger.debug(f"[{s_fmt} --> {e_fmt}] {speaker}: {text}".rstrip(": "))
+
+        # Final counts summary
+        try:
+            logger.debug(f"Logged segments: original={orig_count}" + (f", other={other_count}" if other_count is not None else ""))
+        except Exception:
+            logger.debug("Logged segments: counts unavailable")
+    except Exception as _err:
+        logger.warning(f"Segment logging skipped due to error: {_err}")
+
+
+def save_state(data, output_path):
+    """Save JSON state to disk."""
+    logger.info(f"Saving state to {output_path}")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def load_state(input_path):
+    """Load JSON state from disk."""
+    logger.debug(f"Loading state from {input_path}")
+    try:
+        with open(input_path, "r", encoding="utf-8-sig") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load state from {input_path}: {e}")
+        return {}
+    
+# Get an audio file duration
+def get_audio_duration(file_path):
+    try:
+        audio = AudioSegment.from_file(file_path)
+        return audio.duration_seconds
+    except Exception as e:
+        logger.warning(f"Failed to get audio duration for {file_path}: {e}")
+        return 0
