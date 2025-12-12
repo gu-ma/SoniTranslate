@@ -1,0 +1,27 @@
+# Base image used as starter
+FROM iart/sonitranslate-base:cu128
+
+# Copy content to image
+COPY . /src
+
+# # # Update pip to latest version without issues 
+# # RUN pip install --no-cache-dir "pip==24.0"
+
+# # Ensure legacy build tools and compiler deps
+# RUN pip install --no-cache-dir "pip==24.0" "setuptools<70" "wheel" "Cython" "ninja" "packaging"
+
+# # Install fairseq directly from GitHub (official 0.12.2 tag)
+# RUN pip install --no-cache-dir --no-build-isolation git+https://github.com/facebookresearch/fairseq.git@v0.12.2
+
+# # Build pyworld from source using the same environment
+# RUN pip install --no-cache-dir --no-build-isolation pyworld
+
+# Install all (base, extra, xtts, etc... combined without version number)
+RUN pip install -v -r /src/requirements_raw.txt
+
+# Remove onnxruntime (cpu) and install onnxruntime-gpu supported by cuda 12
+# https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html#cuda-12x
+RUN pip uninstall -y onnxruntime onnxruntime-gpu
+RUN pip install onnxruntime-gpu==1.20.1
+
+RUN export LD_LIBRARY_PATH=${PWD}/venv/lib64/python3.11/site-packages/nvidia/cublas/lib:${PWD}/venv/lib64/python3.11/site-packages/nvidia/cudnn/lib

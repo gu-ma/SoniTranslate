@@ -2,20 +2,27 @@
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
 # Install necessary dependencies
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y \
+RUN apt update && \
+    apt install -y \
     python3-pip \
     git \
     ffmpeg \
+    libavformat-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
+    libswscale-dev \
+    libswresample-dev \
     libsm6 \
     libxext6 \
     wget \
     curl \
     iproute2 \
     iputils-ping \
-    && apt-get autoremove -y \
-    && apt-get clean \
+    pkg-config \
+    && apt autoremove -y \
+    && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Update pip

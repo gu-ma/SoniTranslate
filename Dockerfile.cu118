@@ -1,0 +1,42 @@
+# Base image used as starter
+FROM iart/sonitranslate-base:cu118
+
+# Copy content to image
+COPY . /src
+
+# Update pip
+RUN pip install -U --no-cache-dir "pip==24.0" "setuptools" "wheel"
+
+# # Ensure legacy build tools and compiler deps
+# RUN pip install --no-cache-dir "pip==24.0" "setuptools<70" "wheel" "Cython" "ninja" "packaging"
+
+# # Install fairseq directly from GitHub (official 0.12.2 tag)
+# RUN pip install --no-cache-dir --no-build-isolation git+https://github.com/facebookresearch/fairseq.git@v0.12.2
+
+# # Build pyworld from source using the same environment
+# RUN pip install --no-cache-dir --no-build-isolation pyworld
+
+# Install recent pytorch (2.7.0+cu118)
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Install 
+RUN pip install -r /src/requirements_base.txt
+RUN pip install -r /src/requirements_extra.txt
+
+# Install ONNX runtime Cuda 11.X (https://onnxruntime.ai/docs/install/#install-onnx-runtime-gpu-cuda-11x)
+RUN pip install flatbuffers numpy packaging protobuf sympy
+RUN pip install onnxruntime-gpu --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/
+
+# Install optionnal
+RUN pip install -q piper-tts==1.2.0
+RUN pip install -q -r /src/requirements_xtts.txt
+RUN pip install -q TTS==0.21.1  --no-deps
+
+# Install additional
+RUN pip install deepl elevenlabs python-dotenv langchain-openai
+
+# Update some pip 
+RUN pip install -U edge-tts
+
+# Some missing dependencies
+RUN pip install soxr

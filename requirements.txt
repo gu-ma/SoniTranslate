@@ -13,7 +13,8 @@ git+https://github.com/m-bain/whisperX.git@a5dca2c
 gTTS
 gradio_client==0.10.1
 praat-parselmouth>=0.4.3
-pyworld==0.3.2
+# pyworld==0.3.2
+pyworld-prebuilt
 faiss-cpu==1.7.3
 torchcrepe==0.0.20
 ffmpeg-python>=0.2.0

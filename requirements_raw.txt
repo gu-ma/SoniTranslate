@@ -1,0 +1,83 @@
+# Core / ML
+torch
+torchvision
+torchaudio
+onnxruntime-gpu
+faiss-cpu
+fairseq2
+transformers
+accelerate
+optimum
+sentencepiece
+langchain-openai
+deepl
+elevenlabs
+python-dotenv
+
+# Audio / TTS / STT
+whisperx
+pyannote.audio
+torchcrepe
+# whisperx already depends on ctranslate2, faster-whisper, and torchaudio
+
+# Web / UI / API
+gradio
+gradio_client
+fastapi
+flask
+
+# Utilities / I/O
+ffmpeg-python
+pydub
+soundfile
+gdown
+rarfile
+pypdf
+python-docx
+
+# Speech / voice toolkits & helpers
+edge_tts
+deep_translator
+gTTS
+openai
+tiktoken
+encodec
+
+# Data / analysis / ML helpers
+numpy
+scipy
+pandas
+scikit-learn
+numba
+einops
+matplotlib
+umap-learn
+
+# Text / NLP / tokenizers
+nltk
+jieba
+pypinyin
+hangul_romanize
+jamo
+g2pkk
+gruut[de,es,fr]
+srt
+
+# Voice / TTS extras
+praat-parselmouth
+pyworld-prebuilt
+coqpit
+
+# Misc libs
+nest_asyncio
+ipython
+packaging
+pyyaml
+fsspec
+aiohttp
+tqdm
+anyascii
+inflect
+num2words
+unidecode
+pysbd

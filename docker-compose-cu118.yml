@@ -1,11 +1,11 @@
-name: docker-misc-${CONTAINER_NAME}_cu128
+name: docker-misc-${CONTAINER_NAME}_cu118
 services:
   sonitranslate:
-    image: ${CONTAINER_NAME}_cu128:latest
-    container_name: ${CONTAINER_NAME}_cu128
+    image: ${CONTAINER_NAME}_cu118:latest
+    container_name: ${CONTAINER_NAME}_cu118
     build:
       context: .
-      dockerfile: Dockerfile.cu128
+      dockerfile: Dockerfile.cu118
     working_dir: /app
     volumes:
       - .:/app
@@ -14,6 +14,8 @@ services:
     ports:
       - 8201:7860
     command: python app_rvc.py --public_url --theme SherlockRamos/Feliz --verbosity_level debug
+    # Start with bash
+    # command: bash
     tty: true
     environment:
       - YOUR_HF_TOKEN=${YOUR_HF_TOKEN}
