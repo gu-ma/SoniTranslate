@@ -41,9 +41,10 @@ def synthesize_and_mix(
         2. Preprocess audio
         3. Generate TTS voices
         4. Accelerate segments (optional)
-        5. Create translated audio
-        6. Mix with base audio
-        7. Save Phase 3 JSON
+        5. Normalize TTS volume
+        6. Create translated audio
+        7. Mix with base audio
+        8. Export mp3 + Save Phase 3 JSON
     """
 
     # ------------------------------------------------------------------
@@ -56,6 +57,8 @@ def synthesize_and_mix(
     # Ensure default empty strings for missing voices (up to tts_voice11)
     for i in range(12):
         tts_kwargs.setdefault(f"tts_voice{i:02}", "")
+    tts_kwargs["model_id_elevenlabs"] = config_kwargs.get("model_id_elevenlabs", "")
+    # Acceleration config
     max_accelerate_audio = float(config_kwargs.get("max_accelerate_audio", 1.2))
     min_accelerate_audio = float(config_kwargs.get("min_accelerate_audio", 1.0))
     acceleration_regulate = bool(
@@ -99,6 +102,7 @@ def synthesize_and_mix(
     base_audio_wav = os.path.join(temp_dir, "phase3_audio.wav")
     base_video_file = os.path.join(temp_dir, "phase3_video.mp4")
     dub_audio_file = os.path.join(temp_dir, "phase3_audio_dub.wav")
+    dub_norm_audio_file = os.path.join(temp_dir, "phase3_audio_dub_norm.wav")
     mix_audio_file = os.path.join(temp_dir, "phase3_audio_mix.wav")
     # Final audio
     base_name = os.path.splitext(os.path.basename(media_file))[0]
@@ -178,10 +182,27 @@ def synthesize_and_mix(
         raise Exception(f"Translated audio creation process failed: {str(e)}") from e
 
     # ------------------------------------------------------------------
+    # Normalize volume
+    # ------------------------------------------------------------------
+
+    logger.info("[5] Normalizing TTS volume...")
+    mix_audio_volume(
+        base_audio_wav=dub_audio_file,
+        dub_audio_file=dub_audio_file,
+        mix_audio_file=dub_norm_audio_file,
+        volume_original_audio=1.0,
+        volume_translated_audio=0.0,
+        loudnorm_preset="audio_guide",
+        enable_loudnorm=True,
+        volume_boost_db=-1.0,
+        limiter=1.0,
+    )
+
+    # ------------------------------------------------------------------
     # Mix with base audio
     # ------------------------------------------------------------------
 
-    logger.info("[5] Mixing audio...")
+    logger.info("[6] Mixing audio...")
     try:
         remove_files(mix_audio_file)
         if base_audio_wav and os.path.exists(base_audio_wav):
@@ -190,7 +211,7 @@ def synthesize_and_mix(
                     logger.info(f"Using mix method: {mix_method}")
                     mix_audio_volume(
                         base_audio_wav,
-                        dub_audio_file,
+                        dub_norm_audio_file,
                         mix_audio_file,
                         vol_original,
                         vol_translated,
@@ -207,18 +228,16 @@ def synthesize_and_mix(
                     )
                     mix_audio_segment_ducking(
                         base_audio_wav,
-                        dub_audio_file,
+                        dub_norm_audio_file,
                         mix_audio_file,
-                        vol_original,
                         vol_translated,
                         volume_automation,
-                        volume_boost_db=1.0,
                     )
                 case "Mixing audio with sidechain compression":
                     logger.info(f"Using mix method: {mix_method}")
                     mix_audio_sidechain(
                         base_audio_wav,
-                        dub_audio_file,
+                        dub_norm_audio_file,
                         mix_audio_file,
                         vol_original,
                         vol_translated,
@@ -227,8 +246,8 @@ def synthesize_and_mix(
                     logger.info(
                         f"Undefined mix method: {mix_method}, creating translated audio."
                     )
-                    # Convert dub_audio_file (WAV) and save as mix_audio_file
-                    audio = AudioSegment.from_wav(dub_audio_file)
+                    # Convert dub_norm_audio_file (WAV) and save as mix_audio_file
+                    audio = AudioSegment.from_wav(dub_norm_audio_file)
                     audio.set_channels(2)
                     audio.export(
                         mix_audio_file,
@@ -238,8 +257,8 @@ def synthesize_and_mix(
 
         else:
             logger.info("No base audio provided — creating translated audio only.")
-            # Convert dub_audio_file (WAV) and save as mix_audio_file
-            audio = AudioSegment.from_wav(dub_audio_file)
+            # Convert dub_norm_audio_file (WAV) and save as mix_audio_file
+            audio = AudioSegment.from_wav(dub_norm_audio_file)
             audio.set_channels(2)
             audio.export(
                 mix_audio_file,
@@ -255,8 +274,6 @@ def synthesize_and_mix(
     # ------------------------------------------------------------------
     # Match amplitude
     # ------------------------------------------------------------------
-
-    logger.info("[6] Matching loudness...")
 
     # def match_target_amplitude(sound, target_dBFS):
     #     change_in_dBFS = target_dBFS - sound.dBFS
@@ -274,27 +291,41 @@ def synthesize_and_mix(
     # # Export back to MP3
     # normalized_tgt.export(mix_audio_file, format="mp3", bitrate="192k")
 
-    match_loudness_LUFS(
-        ref_file=base_audio_wav,
-        tgt_file=mix_audio_file,
-        output_file=final_audio_file,
-        manual_offset_db=manual_offset_db
+    # logger.info("[7] Matching loudness...")
+    # match_loudness_LUFS(
+    #     ref_file=base_audio_wav,
+    #     tgt_file=mix_audio_file,
+    #     output_file=final_audio_file,
+    #     manual_offset_db=manual_offset_db
+    # )
+
+    # ------------------------------------------------------------------
+    # Export final MP3
+    # ------------------------------------------------------------------
+
+    logger.info("[7] Exporting final MP3...")
+    final_audio = AudioSegment.from_wav(mix_audio_file)
+    final_audio.set_channels(2)
+    final_audio.export(
+        final_audio_file,
+        format="mp3",
+        parameters=["-ac", "2"]  # force 2 channels
     )
 
 
     # ------------------------------------------------------------------
-    # 6️⃣ Save final state
+    # Save final state
     # ------------------------------------------------------------------
 
-    logger.info("[7] Saving output state...")
+    logger.info("[8] Saving output state...")
     state_phase3 = {
         "created_at": datetime.now().isoformat(),
         "phase_version": "3.0",
         "media_file": media_file,
         "media_hash": media_hash,
         "target_language": target_language,
-        "segments": segments,
         "tts_kwargs": tts_kwargs,
+        "segments": segments,
         "mix_method": mix_method,
         "output_audio": final_audio_file,
         "config": config,

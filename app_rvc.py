@@ -14,6 +14,7 @@ from soni_translate.llm_fit import (
 from soni_translate.audio_segments import (
     create_translated_audio,
     generate_segment_based_volume_automation,
+    generate_segment_based_volume_automation_chunked,
     mix_audio_volume,
     mix_audio_segment_ducking,
     mix_audio_sidechain
@@ -64,6 +65,7 @@ from soni_translate.utils import (
     get_valid_files,
     get_link_list,
     remove_directory_contents,
+    log_segments
 )
 from soni_translate.mdx_net import (
     UVR_MODELS,
@@ -96,6 +98,9 @@ from soni_translate.text_multiformat_processor import (
     fix_timestamps_docs,
     create_video_from_images,
     merge_video_and_audio,
+)
+from soni_translate.segments_utils import (
+    merge_segments,
 )
 from soni_translate.languages_gui import language_data, news
 import copy
@@ -175,6 +180,7 @@ class SoniTrCache:
             'transcript_align': [],
             'break_align': [],
             'diarize': [],
+            'merge_segments': [],
             'translate': [],
             'llm_fit': [],
             'subs_and_edit': [],
@@ -190,6 +196,7 @@ class SoniTrCache:
             'transcript_align': [],
             'break_align': [],
             'diarize': [],
+            'merge_segments': [],
             'translate': [],
             'llm_fit': [],
             'subs_and_edit': [],
@@ -441,7 +448,9 @@ class SoniTranslate(SoniTrCache):
         volume_translated_audio=1.10,
         output_format_subtitle="srt",
         get_translated_text=False,
+        get_translated_text_encode=True,
         get_video_from_text_json=False,
+        get_video_from_text_json_force=False,
         text_json="{}",
         avoid_overlap=False,
         vocal_refinement=False,
@@ -450,6 +459,7 @@ class SoniTranslate(SoniTrCache):
         diarization_model="pyannote_3.1",
         translate_process="deep_translator",
         llm_fit_process="tighten_and_fit",
+        llm_fit_model=None,
         subtitle_file=None,
         output_type="video (mp4)",
         voiceless_track=False,
@@ -514,7 +524,7 @@ class SoniTranslate(SoniTrCache):
 
         if get_translated_text:
             self.edit_subs_complete = False
-        if get_video_from_text_json:
+        if get_video_from_text_json and not get_video_from_text_json_force:
             if not self.edit_subs_complete:
                 raise ValueError("Generate the transcription first.")
 
@@ -555,7 +565,7 @@ class SoniTranslate(SoniTrCache):
         if tts_voice00[:2].lower() != TRANSLATE_AUDIO_TO[:2].lower():
             wrn_lang = (
                 "Make sure to select a 'TTS Speaker' suitable for"
-                " the translation language to avoid errors with the TTS."
+                " the translation language to avoid errors with the TTS. (ignore if using elevenlabs)"
             )
             warn_disp(wrn_lang, is_gui)
 
@@ -688,6 +698,7 @@ class SoniTranslate(SoniTrCache):
                 logger.info(f"Done: {output}")
                 return output
 
+            # Refine vocals
             if not self.task_in_cache("refine_vocals", [vocal_refinement], {}):
                 self.vocals = None
                 if vocal_refinement:
@@ -705,6 +716,7 @@ class SoniTranslate(SoniTrCache):
                     except Exception as error:
                         logger.error(str(error))
 
+            # Transcription
             if not self.task_in_cache("transcript_align", [
                 subtitle_file,
                 SOURCE_LANGUAGE,
@@ -747,11 +759,13 @@ class SoniTranslate(SoniTrCache):
                         literalize_numbers,
                         segment_duration_limit,
                     )
-                logger.debug(
-                    "Transcript complete, "
-                    f"segments count {len(self.result['segments'])}"
-                )
+                    # Log results
+                    log_segments(
+                        segments=self.result["segments"],
+                        title="Transcript results:"
+                    )
 
+                # Align speech and text
                 self.align_language = self.result["language"]
                 if (
                     not subtitle_file
@@ -768,9 +782,10 @@ class SoniTranslate(SoniTrCache):
                             )
                         else:
                             self.result = align_speech(audio, self.result)
-                            logger.debug(
-                                "Align complete, "
-                                f"segments count {len(self.result['segments'])}"
+                            # Log results
+                            log_segments(
+                                segments=self.result["segments"],
+                                title="Align results:"
                             )
                     except Exception as error:
                         logger.error(str(error))
@@ -778,6 +793,7 @@ class SoniTranslate(SoniTrCache):
             if self.result["segments"] == []:
                 raise ValueError("No active speech found in audio")
 
+            # Break/segment text
             if not self.task_in_cache("break_align", [
                 divide_text_segments_by,
                 text_segmentation_scale,
@@ -802,6 +818,7 @@ class SoniTranslate(SoniTrCache):
                     except Exception as error:
                         logger.error(str(error))
 
+            # Diarization
             if not self.task_in_cache("diarize", [
                 min_speakers,
                 max_speakers,
@@ -820,9 +837,33 @@ class SoniTranslate(SoniTrCache):
                     YOUR_HF_TOKEN,
                     diarize_model_select,
                 )
-                logger.debug("Diarize complete")
+                # Log results
+                log_segments(
+                    segments=self.result_diarize["segments"],
+                    title="Diarization results:"
+                )
+
+            # Merge segments to avoid micro-lines
+            if not self.task_in_cache("merge_segments", [
+                self.result_diarize
+            ], {
+                "result_diarize": self.result_diarize,
+            }):
+                prog_disp("Merging...", 0.65, is_gui, progress=progress)
+                self.result_diarize = merge_segments(
+                    self.result_diarize,
+                    enabled=True
+                )
+                # Log results
+                log_segments(
+                    segments=self.result_diarize["segments"],
+                    title="Merge results:"
+                )
+
+                
             self.result_source_lang = copy.deepcopy(self.result_diarize)
 
+            # Translation
             if not self.task_in_cache("translate", [
                 TRANSLATE_AUDIO_TO,
                 translate_process
@@ -830,19 +871,30 @@ class SoniTranslate(SoniTrCache):
                 "result_diarize": self.result_diarize
             }):
                 prog_disp("Translating...", 0.70, is_gui, progress=progress)
-                lang_source = (
-                    self.align_language
-                    if self.align_language
-                    else SOURCE_LANGUAGE
-                )
-                self.result_diarize["segments"] = translate_text(
-                    self.result_diarize["segments"],
-                    TRANSLATE_AUDIO_TO,
-                    translate_process,
-                    chunk_size=1800,
-                    source=lang_source,
-                )
-                logger.debug("Translation complete")
+
+                if translate_process != "disable_translation":
+                    
+                    lang_source = (
+                        self.align_language
+                        if self.align_language
+                        else SOURCE_LANGUAGE
+                    )
+                    self.result_diarize["segments"] = translate_text(
+                        self.result_diarize["segments"],
+                        TRANSLATE_AUDIO_TO,
+                        translate_process,
+                        chunk_size=1800,
+                        source=lang_source,
+                    )
+                    # Log results
+                    log_segments(
+                        segments=self.result_source_lang["segments"],
+                        other_segments=self.result_diarize["segments"],
+                        title="Translation results:"
+                    )
+
+                else:
+                    logger.info("Translation disabled, skipping this step")
             
             # Fitting with LLM (the cache options are probably not working properly)
             if not self.task_in_cache("llm_fit", [
@@ -851,71 +903,114 @@ class SoniTranslate(SoniTrCache):
             ], {
                 "result_diarize": self.result_diarize
             }):
-                prog_disp("Fitting with LLM...", 0.75, is_gui, progress=progress)
 
-                lang_source = (
-                    self.align_language
-                    if self.align_language
-                    else SOURCE_LANGUAGE
-                )
+                prog_disp("Fitting with LLM... (this can be looong)", 0.75, is_gui, progress=progress)
 
-                # Calculate budgets
-                budgets = per_segment_budgets(
-                    src_segments=self.result_source_lang["segments"],
-                    tgt_segments=self.result_diarize["segments"],
-                    cps_cap=19.0,
-                    safety=0.90,
-                    default_r=1.15,
-                )
+                # skip if llm_fit_process is disable
+                if llm_fit_process != "disable":
 
-                llm_fit_result = llm_fit(
-                    src_segments=self.result_source_lang["segments"],
-                    tgt_segments=self.result_diarize["segments"],
-                    budgets=budgets,
-                    task_mode=llm_fit_process,
-                    target_lang=TRANSLATE_AUDIO_TO,
-                    source_lang=lang_source,
-                    temperature=0.25,
-                    max_retries=0,
-                    # style_notes=[
-                    #     "Neutral, informative tone.",
-                    #     "Use numerals for numbers when natural.",
-                    # ],
-                    # model="openai/gpt-5",
-                    # model="google/gemini-2.5-pro",
-                )
+                    lang_source = (
+                        self.align_language
+                        if self.align_language
+                        else SOURCE_LANGUAGE
+                    )
 
-                self.result_diarize["segments"] = llm_fit_result.segments
-                logger.debug("LLM fit complete")
+                    # Calculate budgets
+                    budgets = per_segment_budgets(
+                        src_segments=self.result_source_lang["segments"],
+                        tgt_segments=self.result_diarize["segments"],
+                        cps_cap=19.0,
+                        safety=0.90,
+                        default_r=1.15,
+                    )
+
+                    llm_fit_result = llm_fit(
+                        src_segments=self.result_source_lang["segments"],
+                        tgt_segments=self.result_diarize["segments"],
+                        budgets=budgets,
+                        task_mode=llm_fit_process,
+                        target_lang=TRANSLATE_AUDIO_TO,
+                        source_lang=lang_source,
+                        temperature=0.25,
+                        max_retries=0,
+                        model=llm_fit_model,
+                        # style_notes=[
+                        #     "Neutral, informative tone.",
+                        #     "Use numerals for numbers when natural.",
+                        # ],
+                    )
+
+                    # log results
+                    log_segments(
+                        segments=self.result_diarize["segments"],
+                        other_segments=llm_fit_result.segments,
+                        title="LLM fit results:"
+                    )
+
+                    # Replace each segment text with the fitted text
+                    for i, segment in enumerate(self.result_diarize["segments"]):
+                        self.result_diarize["segments"][i]["text"] = llm_fit_result.segments[i]["text"]
+               
+                    logger.debug("LLM fit complete")
+                    
+                else:
+                    logger.info("LLM fit disabled, skipping this step")
 
         if get_translated_text:
 
             json_data = []
             for segment in self.result_diarize["segments"]:
                 start = segment["start"]
+                end = segment["end"]
                 text = segment["text"]
                 speaker = int(segment.get("speaker", "SPEAKER_00")[-2:]) + 1
-                json_data.append(
-                    {"start": start, "text": text, "speaker": speaker}
-                )
+                data = {
+                    "start": start,
+                    "end": end,
+                    "text": text,
+                    "speaker": speaker
+                }
+                json_data.append(data)
 
-            # Convert list of dictionaries to a JSON string with indentation
-            json_string = json.dumps(json_data, indent=2)
-            logger.info("Done")
-            self.edit_subs_complete = True
-            return json_string.encode().decode("unicode_escape")
+            if get_translated_text_encode:
+                # Convert list of dictionaries to a JSON string with indentation
+                json_string = json.dumps(json_data, indent=2)
+                logger.info("Done")
+                self.edit_subs_complete = True
+                return json_string.encode().decode("unicode_escape")
+
+            else:
+                logger.info("Done")
+                self.edit_subs_complete = True
+                return json_data
 
         if get_video_from_text_json:
 
-            if self.result_diarize is None:
-                raise ValueError("Generate the transcription first.")
-            # with open('text_json.json', 'r') as file:
-            text_json_loaded = json.loads(text_json)
-            for i, segment in enumerate(self.result_diarize["segments"]):
-                segment["text"] = text_json_loaded[i]["text"]
-                segment["speaker"] = "SPEAKER_{:02d}".format(
-                    int(text_json_loaded[i]["speaker"]) - 1
-                )
+            if not get_video_from_text_json_force:
+
+                if self.result_diarize is None:
+                    raise ValueError("Generate the transcription first.")
+                # with open('text_json.json', 'r') as file:
+                text_json_loaded = json.loads(text_json)
+                for i, segment in enumerate(self.result_diarize["segments"]):
+                    segment["text"] = text_json_loaded[i]["text"]
+                    segment["speaker"] = "SPEAKER_{:02d}".format(
+                        int(text_json_loaded[i]["speaker"]) - 1
+                    )
+            else:
+                # We pass an already loaded json
+                text_json_loaded = text_json
+                self.result_diarize = {"segments": []}
+                for entry in text_json_loaded:  
+                    segment = {  
+                        "start": entry["start"],
+                        "end": entry["end"],
+                        "text": entry["text"],
+                        "speaker": f"SPEAKER_{int(entry['speaker']) - 1:02d}",  
+                    }  
+                    self.result_diarize["segments"].append(segment)
+                # Hack: to remove (doesnt work)
+                self.result_source_lang = copy.deepcopy(self.result_diarize)
 
         # Write subtitle
         if not self.task_in_cache("subs_and_edit", [
@@ -1176,16 +1271,16 @@ class SoniTranslate(SoniTrCache):
 
                     duck_level = volume_original_audio  # Original volume as duck level
                     fade_duration = 0.5  # Duration of fade in/out
-                    volume_automation = generate_segment_based_volume_automation(
+                    volume_automation = generate_segment_based_volume_automation_chunked(
                         self.result_diarize["segments"], 
-                        duck_level, 
-                        fade_duration
+                        chunk_size=40,
+                        duck_level=duck_level, 
+                        fade_duration=fade_duration
                     )
                     mix_audio_segment_ducking(
                         base_audio_wav,
                         dub_audio_file,
                         mix_audio_file,
-                        volume_original_audio,
                         volume_translated_audio,
                         volume_automation
                     )

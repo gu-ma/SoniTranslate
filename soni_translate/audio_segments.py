@@ -313,7 +313,7 @@ def mix_audio_volume(
     volume_translated_audio,
     loudnorm_preset="broadcast",
     enable_loudnorm=False,
-    volume_boost_db=1.0,
+    volume_boost_db=0.0,
     limiter=0.95,
 ):
     """
@@ -333,7 +333,7 @@ def mix_audio_volume(
     filter_parts = [
         f"[0:a]volume={volume_original_audio}[bg];"
         f"[1:a]volume={volume_translated_audio}[dub]",
-        "[bg][dub]amix=inputs=2:duration=longest",
+        "[bg][dub]amix=inputs=2:normalize=0:duration=longest",
     ]
 
     if enable_loudnorm:
@@ -374,7 +374,7 @@ def mix_audio_segment_ducking(
     volume_automation,
     loudnorm_preset="broadcast",
     enable_loudnorm=False,
-    volume_boost_db=1.0,
+    volume_boost_db=0.0,
     limiter=0.95,
 ):
     """
@@ -395,7 +395,7 @@ def mix_audio_segment_ducking(
     filter_parts = [
         f"[0:a]{volume_automation}[bg]",
         f"[1:a]volume={volume_translated_audio}[dub]",
-        "[bg][dub]amix=inputs=2:duration=longest",
+        "[bg][dub]amix=inputs=2:normalize=0:duration=longest",
     ]
 
     if enable_loudnorm:
@@ -405,6 +405,7 @@ def mix_audio_segment_ducking(
     filter_parts.append(f"volume={volume_boost_str}[final]")
 
     filter_graph = ",".join(filter_parts)
+    logger.debug(filter_graph)
 
     # filter_graph = (
     #     f"[0:a]{volume_automation}[bg_ducked];"
@@ -444,7 +445,7 @@ def mix_audio_sidechain(
     volume_translated_audio,
     loudnorm_preset="broadcast",
     enable_loudnorm=False,
-    volume_boost_db=1.0,
+    volume_boost_db=0.0,
     limiter=0.95,
 ):
     """
@@ -487,7 +488,7 @@ def mix_audio_sidechain(
             f"level_sc={level_sc}:mix={sc_mix}:makeup={makeup}[bg_duck]"
         ),
         
-        "[bg_duck][mix_src]amix=inputs=2:duration=first:dropout_transition=0",  # Mix ducked BG with dub
+        "[bg_duck][mix_src]amix=inputs=2:normalize=0:duration=first:dropout_transition=0",  # Mix ducked BG with dub
     ]
 
     if enable_loudnorm:

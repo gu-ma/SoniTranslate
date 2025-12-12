@@ -161,7 +161,7 @@ def translate_and_fit(
             raise Exception(f"Segment selection process failed: {str(e)}") from e
     else:
         logger.info("Segment selection skipped — keeping all segments.")
-        segments = segments_translated
+        segments = segments_fitted
 
     # ------------------------------------------------------------------
     # Save Phase 2 state
